@@ -1,0 +1,1 @@
+f2py -c -m projection --f90flags="-fopenmp -lm -ffree-form -ffree-line-length-none" --opt="-O3" -lgomp --fcompiler=gnu95 projection.f90
