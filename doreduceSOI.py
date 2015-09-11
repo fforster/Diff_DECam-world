@@ -16,7 +16,7 @@ from mx.DateTime import * # date conversion
 from projection import projfast
 from conv2fast import conv2fast
 
-import minuit
+#import minuit
 
 import pyfits as fits
 
@@ -39,7 +39,7 @@ except getopt.GetoptError:
     sys.exit(1)
 for opt, arg in opts:
     if opt in ('-h', '--help'):
-        print "\nCC by F.Forster\nMatch DECam and SOI images to compute image subtraction"
+        print "\nCC by F.Forster and A.Razza\nMatch DECam and SOI images to compute image subtraction"
         print "-f --filter: select filter"
         print "-s --supernova: select supernova"
         print "-o --obsdate: observation date (directory name)"
