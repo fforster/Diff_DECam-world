@@ -93,8 +93,7 @@ npix = 0.265 / 0.155
 
 # open and plot reference image
 
-refdir = '/home/fforster/Work/DATA_CMMPIPE'
-refdir = '/media/fforster_fondecyt_2Tb_2014/DATA/DATA_CMMPIPE'
+refdir = 'DATA_CMMPIPE'
 if supernova == 'Bel':
     field = 'Blind14A-P_10'
     CCD = 'N6'
