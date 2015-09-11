@@ -93,7 +93,7 @@ npix = 0.265 / 0.155
 
 # open and plot reference image
 
-refdir = 'DATA_CMMPIPE'
+refdir = 'DATA/DATA_CMMPIPE'
 if supernova == 'Bel':
     field = 'Blind14A-P_10'
     CCD = 'N6'
@@ -170,7 +170,7 @@ CCDSOAR = 2
 filters = {'g': 's0011 g SDSS', 'r': 's0012 r SDSS'}
 
 # output directory
-indir = '/media/fforster_fondecyt_2Tb_2014/DATA/SOI/%s' % obsdate
+indir = 'DATA/SOI/%s' % obsdate
 outdir = "%s/OUT" % indir
 if not os.path.exists(outdir):
     os.makedirs(outdir)
