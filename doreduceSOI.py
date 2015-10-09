@@ -50,7 +50,7 @@ for opt, arg in opts:
         print "-m --mosaic: create SOI image mosaic based on the available data"
         print "-c --convolve: compute kernel, projection and image convolution"
         print "-p --photometry: do photometry"
-        print "e.g. python doreduceSOI.py --filter g --supernova Bel --obsdate 20140324 --order 3 --download --detrend --mosaic --convolve --photometry"
+        print "e.g. python doreduceSOI.py --filter g --supernova Bel --obsdate 20140324 --order 3 --detrend --mosaic --convolve --photometry"
         sys.exit()
     elif opt in ('-f', '--filter'):
         filter = arg
