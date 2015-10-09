@@ -11,7 +11,7 @@ from scipy import stats
 from scipy import ndimage
 from scipy import signal as scipysignal
 from pylab import *
-from mx.DateTime import * # date conversion
+#from mx.DateTime import * # date conversion
 
 from projection import projfast
 from conv2fast import conv2fast
@@ -43,7 +43,7 @@ for opt, arg in opts:
         print "-f --filter: select filter"
         print "-s --supernova: select supernova"
         print "-o --obsdate: observation date (directory name)"
-        print "-n --order: order of coordinate transformation (1 or 2 allowed)"
+        print "-n --order: order of coordinate transformation (0 to 3 allowed)"
         print "-d --download: download required images according looking for MJD"
         print "-t --detrend: do bias and flat fielding"
         print "-m --mosaic: create SOI image mosaic based on the available data"
