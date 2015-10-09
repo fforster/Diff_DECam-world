@@ -18,7 +18,8 @@ from conv2fast import conv2fast
 
 #import minuit
 
-import pyfits as fits
+#import pyfits as fits
+from astropy.io import fits
 
 projfast.set_num_threads(4)
 conv2fast.set_num_threads(4)
