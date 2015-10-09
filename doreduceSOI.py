@@ -171,7 +171,7 @@ CCDSOAR = 2
 filters = {'g': 's0011 g SDSS', 'r': 's0012 r SDSS'}
 
 # output directory
-indir = 'DATA/SOI/%s' % obsdate
+indir = 'DATA/SOAR/SOI/%s' % obsdate
 outdir = "%s/OUT" % indir
 if not os.path.exists(outdir):
     os.makedirs(outdir)
