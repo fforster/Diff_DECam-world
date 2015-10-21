@@ -83,7 +83,7 @@ docrblaster = True
 doplot = True
 
 # background backfilter size
-backsize = 128 # 64
+backsize = 64 # 128
 
 # small tick labels
 matplotlib.rc('xtick', labelsize = 7) 
