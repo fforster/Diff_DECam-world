@@ -75,8 +75,6 @@ for opt, arg in opts:
     elif opt in ('-p', '--photometry'):
         dophotometry = True
 
-print supernova
-
 # other options
 dotrim = True
 DECamize = True  # rotate image to have the same orientation of the DECam images
@@ -164,6 +162,8 @@ elif supernova == 'Nala':
 else:
     print "WARNING: supernova %s not in the list of valid supernova" % supernova
     sys.exit()
+
+print supernova
 
 # SOAR CCD which we want to project
 CCDSOAR = 2
