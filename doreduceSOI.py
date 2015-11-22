@@ -12,6 +12,7 @@ from scipy import ndimage
 from scipy import signal as scipysignal
 from pylab import *
 #from mx.DateTime import * # date conversion
+from astropy.time import Time # new date conversion
 
 from projection import projfast
 from conv2fast import conv2fast
@@ -73,8 +74,6 @@ for opt, arg in opts:
         doconvolve = True
     elif opt in ('-p', '--photometry'):
         dophotometry = True
-
-print supernova
 
 # other options
 dotrim = True
@@ -163,6 +162,8 @@ elif supernova == 'Nala':
 else:
     print "WARNING: supernova %s not in the list of valid supernova" % supernova
     sys.exit()
+
+print supernova
 
 # SOAR CCD which we want to project
 CCDSOAR = 2
@@ -675,10 +676,12 @@ if domosaic:
             filteri1 = header['FILTER1']
             filteri2 = header['FILTER2']
             obj = header['OBJECT']
-            (yyyy, mm, dd) = map(int, header['DATE-OBS'].split('-'))
-            (hh, mmm, ss) = map(float, header['TIME-OBS'].split(':'))
-            MJD = DateTime(yyyy, mm, dd, int(hh), int(mmm), ss).mjd
-    
+            #(yyyy, mm, dd) = map(int, header['DATE-OBS'].split('-'))
+            #(hh, mmm, ss) = map(float, header['TIME-OBS'].split(':'))
+            isotime = header['DATE-OBS'] + 'T' + header['TIME-OBS']
+            #MJD = DateTime(yyyy, mm, dd, int(hh), int(mmm), ss).mjd
+            MJD = Time(isotime).mjd
+                
             #print i, filteri1, filteri2, obj, filteri1 == "s0000 Open", filteri2 == filters[filter]
         
             if filteri1 == "s0000 Open" and filteri2 == filters[filter]:
