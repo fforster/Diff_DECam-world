@@ -695,7 +695,8 @@ if domosaic:
                 iMJDs.append(MJD)
 
                 # open image to project
-                fitsnew = "%s/%s_%s_%02i_%04i.fits" % (outdir, supernova.upper(), filter, CCDSOAR, ifile)
+                #fitsnew = "%s/%s_%s_%02i_%04i.fits" % (outdir, supernova.upper(), filter, CCDSOAR, ifile)
+                fitsnew = "%s/%s_%s_%02i_%04i.fits" % (outdir, supernova, filter, CCDSOAR, ifile)
                 background = fitsnew.replace(".fits", "_background-%03i.fits" % backsize)
                 headernew = fits.open(fitsnew)[0].header
                 background = fits.open(background)[0].data
@@ -703,7 +704,8 @@ if domosaic:
                 (nx2, ny2) = np.shape(datanew)
     
                 # load sextractor sources
-                (x, y, flux, e_flux, r, flag) = np.loadtxt("%s/%s_%s_%02i_%04i.fits-catalogue.dat" % (outdir, supernova.upper(), filter, CCDSOAR, ifile), usecols = (1, 2, 5, 6, 8, 9)).transpose()
+                #(x, y, flux, e_flux, r, flag) = np.loadtxt("%s/%s_%s_%02i_%04i.fits-catalogue.dat" % (outdir, supernova.upper(), filter, CCDSOAR, ifile), usecols = (1, 2, 5, 6, 8, 9)).transpose()
+                (x, y, flux, e_flux, r, flag) = np.loadtxt("%s/%s_%s_%02i_%04i.fits-catalogue.dat" % (outdir, supernova, filter, CCDSOAR, ifile), usecols = (1, 2, 5, 6, 8, 9)).transpose()
     
                 # plot reference image
                 if doplot:
