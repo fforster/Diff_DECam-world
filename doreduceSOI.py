@@ -353,7 +353,7 @@ if dodetrend:
 
                     # run sextractor
                     background = filename.replace(".fits", "_background-%03i.fits" % backsize)
-                    command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (filename, filename, backsize, background)
+                    command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (filename, filename, backsize, background)
                     print command
                     os.system(command)
     
@@ -696,7 +696,7 @@ if domosaic:
 
                 # open image to project
                 #fitsnew = "%s/%s_%s_%02i_%04i.fits" % (outdir, supernova.upper(), filter, CCDSOAR, ifile)
-                fitsnew = "%s/%s_%s_%02i_%04i.fits" % (outdir, supernova, filter, CCDSOAR, ifile)
+                fitsnew = "%s/%s_%s_%02i_%04i.fits" % (outdir, supernova, filter, CCDSOAR, ifile) ##(outdir, obj, filter, CCDSOAR, ifile)
                 background = fitsnew.replace(".fits", "_background-%03i.fits" % backsize)
                 headernew = fits.open(fitsnew)[0].header
                 background = fits.open(background)[0].data
@@ -918,10 +918,10 @@ if domosaic:
                 fitsout = "%s/%s_%s_%02i_%04i_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, ifile, order)
                 proj.writeto(fitsout, clobber = True)
 
-                # run sextractor on projected image + background image
+                # run crblaster on projected image + background image
                 if docrblaster:
                     
-                    crblasterpath = '/home/fforster/Work/crblaster/crblaster'
+                    crblasterpath = '/home/fabolous4/DAS/HiTS/crblaster/crblaster'
                     
                     inmosaic = "%s/%s_%s_%02i_%04i_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, ifile, order)
                     outmosaic = "%s/%s_%s_%02i_%04i_DECam_crblaster_o%i.fits" % (outdir, supernova, filter, CCDSOAR, ifile, order)
@@ -930,8 +930,8 @@ if domosaic:
                     if os.path.exists(outmosaic):
                         os.system("rm -rf %s" % outmosaic)
                         
-                    ncores = 4
-                    command = "mpirun -n %i %s 1 1 %i %s %s" % (ncores, crblasterpath, ncores, inmosaic, outmosaic)
+                    ncores = 2
+                    command = "mpirun -np %i %s 1 1 %i %s %s" % (ncores, crblasterpath, ncores, inmosaic, outmosaic)
                     print command
                     os.system(command)
                     
@@ -959,7 +959,7 @@ if domosaic:
     # effective MJD
     MJD = np.average(np.array(iMJDs))
     headerref.update("MJD-OBS", "%s" % MJD)
-
+    
     # save final projected image
     final[nmosaic != 0] = final[nmosaic != 0] / nmosaic[nmosaic != 0]
     final = float32(final)
@@ -1010,7 +1010,7 @@ rs2Dstars = np.array(np.sqrt((Xstars - (npsf + nf - 1.) / 2.)**2 + (Ystars - (np
 if doconvolve:
 
     # run sextractor on original image to remove background
-    command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
+    command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
     print command
     os.system(command)
     datareforig = np.array(dataref)
@@ -1040,7 +1040,7 @@ if doconvolve:
     noise.writeto(filename.replace(".fits", "_noise.fits"), clobber = True)
 
     # run sextractor on projected image
-    command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -VERBOSE_TYPE QUIET" % (filename, filename, backsize)
+    command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -VERBOSE_TYPE QUIET" % (filename, filename, backsize)
     print command
     os.system(command)
     
