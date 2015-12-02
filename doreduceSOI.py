@@ -11,15 +11,11 @@ from scipy import stats
 from scipy import ndimage
 from scipy import signal as scipysignal
 from pylab import *
-#from mx.DateTime import * # date conversion
 from astropy.time import Time # new date conversion
 
 from projection import projfast
 from conv2fast import conv2fast
 
-#import minuit
-
-#import pyfits as fits
 from astropy.io import fits
 
 projfast.set_num_threads(4)
@@ -676,10 +672,7 @@ if domosaic:
             filteri1 = header['FILTER1']
             filteri2 = header['FILTER2']
             obj = header['OBJECT']
-            #(yyyy, mm, dd) = map(int, header['DATE-OBS'].split('-'))
-            #(hh, mmm, ss) = map(float, header['TIME-OBS'].split(':'))
             isotime = header['DATE-OBS'] + 'T' + header['TIME-OBS']
-            #MJD = DateTime(yyyy, mm, dd, int(hh), int(mmm), ss).mjd
             MJD = Time(isotime).mjd
                 
             #print i, filteri1, filteri2, obj, filteri1 == "s0000 Open", filteri2 == filters[filter]
@@ -695,8 +688,7 @@ if domosaic:
                 iMJDs.append(MJD)
 
                 # open image to project
-                #fitsnew = "%s/%s_%s_%02i_%04i.fits" % (outdir, supernova.upper(), filter, CCDSOAR, ifile)
-                fitsnew = "%s/%s_%s_%02i_%04i.fits" % (outdir, supernova, filter, CCDSOAR, ifile) ##(outdir, obj, filter, CCDSOAR, ifile)
+                fitsnew = "%s/%s_%s_%02i_%04i.fits" % (outdir, obj, filter, CCDSOAR, ifile)
                 background = fitsnew.replace(".fits", "_background-%03i.fits" % backsize)
                 headernew = fits.open(fitsnew)[0].header
                 background = fits.open(background)[0].data
@@ -704,8 +696,7 @@ if domosaic:
                 (nx2, ny2) = np.shape(datanew)
     
                 # load sextractor sources
-                #(x, y, flux, e_flux, r, flag) = np.loadtxt("%s/%s_%s_%02i_%04i.fits-catalogue.dat" % (outdir, supernova.upper(), filter, CCDSOAR, ifile), usecols = (1, 2, 5, 6, 8, 9)).transpose()
-                (x, y, flux, e_flux, r, flag) = np.loadtxt("%s/%s_%s_%02i_%04i.fits-catalogue.dat" % (outdir, supernova, filter, CCDSOAR, ifile), usecols = (1, 2, 5, 6, 8, 9)).transpose()
+                (x, y, flux, e_flux, r, flag) = np.loadtxt("%s/%s_%s_%02i_%04i.fits-catalogue.dat" % (outdir, obj, filter, CCDSOAR, ifile), usecols = (1, 2, 5, 6, 8, 9)).transpose()
     
                 # plot reference image
                 if doplot:
@@ -733,7 +724,8 @@ if domosaic:
                 
                 if doplot:
                     ax.scatter(x[flag <= 4] / npix + ibest, y[flag <= 4] / npix + jbest, marker = 'o', facecolors = 'none', color = 'r', s = 10, lw = 0.2)
-                    plt.savefig("imref.png", dpi = 400, bbox_inches = 'tight')
+                    figname = os.path.join(outdir,'imref.png')
+                    plt.savefig(figname, dpi = 400, bbox_inches = 'tight')
                     
                     
                 # Linear transformation
@@ -747,12 +739,14 @@ if domosaic:
                     fig, ax = plt.subplots()
                     for ipt in range(len(x1new)):
                         ax.plot([x1new[ipt], x2new[ipt] / npix + ibest], [y1new[ipt], y2new[ipt] / npix + jbest], 'r')
-                    plt.savefig("xy_match_DECam_o%i.png" % order)
+                    figname = os.path.join(outdir,"xy_match_DECam_o%i.png" % order)
+                    plt.savefig(figname)
     
                     # plot intersection in DECam coordinates before projection
                     fig, ax = plt.subplots()
                     ax.scatter(x1new - (x2new / npix + ibest), y1new - (y2new / npix + jbest), marker = '.') 
-                    plt.savefig("xy_diff_DECam_o%i.png" % order)
+                    figname = os.path.join(outdir,"xy_diff_DECam_o%i.png" % order)
+                    plt.savefig(figname)
     
                 # solve linear transformation between two coordinate systems
                 if order == 0:
@@ -794,7 +788,8 @@ if domosaic:
                     fig, ax = plt.subplots()
                     for ipt in range(len(x1new)):
                         ax.plot([x1t[ipt], x2new[ipt]], [y1t[ipt], y2new[ipt]], 'r')
-                    plt.savefig("xy_match_SOAR_o%i.png" % order)
+                    figname = os.path.join(outdir,"xy_match_SOAR_o%i.png" % order)
+                    plt.savefig(figname)
 
                 # remove outliers to refine solution
                 diffx = x1t - x2new
@@ -849,7 +844,8 @@ if domosaic:
                 # plot new solution
                 if doplot:
                     ax.scatter(x1t[mask] - x2new[mask], y1t[mask] - y2new[mask], marker = 'o', c = 'g', s = 200, facecolors = 'none')
-                    plt.savefig("xy_diff_SOAR_o%i.png" % order)
+                    figname = os.path.join(outdir,"xy_diff_SOAR_o%i.png" % order)
+                    plt.savefig(figname)
     
                 # show all original points in new coordinate system
                 if doplot:
@@ -869,7 +865,8 @@ if domosaic:
                     ax.scatter(x1tref, y1tref, marker = '.', c = 'r', lw = 0)
                     ax.scatter(x1t, y1t, marker = 'o', c = 'b', facecolors = 'none')
                     print np.max(xref), np.max(yref)
-                    plt.savefig("xy_transformed_SOAR_o%i.png" % order)
+                    figname = os.path.join(outdir,"xy_transformed_SOAR_o%i.png" % order)
+                    plt.savefig(figname)
     
                 # fix nans
                 datanew[np.invert(np.isfinite(datanew))] = 0
@@ -1093,7 +1090,8 @@ if doconvolve:
 
     if doplot:
         ax.scatter(xref[mask], yref[mask], marker = 'o', c = 'b', s = 5, facecolors = 'none', lw = 0.5)
-        plt.savefig("test_xrefyref_o%i.png" % order, dpi = 300)
+        figname = os.path.join(outdir,"test_xrefyref_o%i.png" % order)
+        plt.savefig(figname, dpi = 300)
 
     # select stars to train kernel
     for isource in range(len(xref)):
@@ -1203,7 +1201,8 @@ if doconvolve:
         fig, ax = plt.subplots()
         im = ax.imshow(psf, interpolation = 'nearest', origin = 'lower')
         fig.colorbar(im)
-        plt.savefig("psf_o%i.png" % order)
+        figname = os.path.join(outdir,"psf_o%i.png" % order)
+        plt.savefig(figname)
 
     # start building kernel
     X = np.zeros((nstars * npsf2, nvar))
@@ -1254,7 +1253,8 @@ if doconvolve:
     if doplot:
         fig, ax = plt.subplots()
         ax.imshow(solfilter, interpolation = 'nearest', origin = 'lower')
-        plt.savefig("solfilter_o%i.png" % order)
+        figname = os.path.join(outdir,"solfilter_o%i.png" % order)
+        plt.savefig(figname)
 
     # Compute normalization factor
     fig, ax = plt.subplots()
@@ -1348,12 +1348,14 @@ if dophotometry:
         fig, ax = plt.subplots()
         im = ax.imshow(psf, interpolation = 'nearest', origin = 'lower')
         fig.colorbar(im)
-        plt.savefig("psf_o%i.png" % order)
+        figname = os.path.join(outdir,"psf_o%i_phot.png" % order)
+        plt.savefig(figname)
         
         fig, ax = plt.subplots()
         im = ax.imshow(solfilter, interpolation = 'nearest', origin = 'lower')
         fig.colorbar(im)
-        plt.savefig("solfilter_o%i.png" % order)
+        figname = os.path.join(outdir,"solfilter_o%i_phot.png" % order)
+        plt.savefig(figname)
 
     print rs2Dstars.flatten()[np.argmax(psf.flatten())]
 
@@ -1424,26 +1426,6 @@ if dophotometry:
     ax[1, 3].set_title("snr", fontsize = 6)
     plt.savefig(filename.replace(".fits", "_supernova.png"), bbox_inches = 'tight', pad_inches = 0.01)
 
-#    # plot weights
-#    fig, ax = plt.subplots()
-#    im = ax.imshow(weights, interpolation = 'nearest', origin = 'lower')
-#    fig.colorbar(im)
-#    plt.savefig("weights.png")
-#
-#    # plot variance 
-#    var[np.invert(maskphoto)] = 0
-#    fig, ax = plt.subplots()
-#    im = ax.imshow(var, interpolation = 'nearest', origin = 'lower', clim = (0, 300))
-#    fig.colorbar(im)
-#    plt.savefig("var.png")
-#
-#    # plot psf
-#    psf[np.invert(maskphoto)] = 0
-#    fig, ax = plt.subplots()
-#    im = ax.imshow(psf, interpolation = 'nearest', origin = 'lower')
-#    fig.colorbar(im)
-#    plt.savefig("psf.png")
-
     # compute flux
     flux = np.sum(weights * diff)
     e_flux = np.sqrt(np.sum(weights**2 * var))
@@ -1458,12 +1440,14 @@ if dophotometry:
         fig, ax = plt.subplots()
         im = ax.imshow(weights * diff, interpolation = 'nearest', origin = 'lower')
         fig.colorbar(im)
-        plt.savefig("flux-weights_o%i.png" % order)
+        figname = os.path.join(outdir,"flux-weights_o%i.png" % order)
+        plt.savefig(figname)
         diff[np.invert(maskphoto)] = 0
         fig, ax = plt.subplots()
         im = ax.imshow(diff, interpolation = 'nearest', origin = 'lower', clim = (0, 200))
         fig.colorbar(im)
-        plt.savefig("flux_o%i.png" % order)
+        figname = os.path.join(outdir,"flux_o%i.png" % order)
+        plt.savefig(figname)
 
     # open CCD numbers file
     CCDn = {}
