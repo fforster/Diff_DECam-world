@@ -922,7 +922,7 @@ if domosaic:
                 # run crblaster on projected image + background image
                 if docrblaster:
                     
-                    crblasterpath = '/home/fabolous4/DAS/HiTS/crblaster/crblaster'
+                    crblasterpath = 'crblasterpath/crblaster'
                     
                     inmosaic = "%s/%s_%s_%02i_%04i_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, ifile, order)
                     outmosaic = "%s/%s_%s_%02i_%04i_DECam_crblaster_o%i.fits" % (outdir, supernova, filter, CCDSOAR, ifile, order)
@@ -931,7 +931,7 @@ if domosaic:
                     if os.path.exists(outmosaic):
                         os.system("rm -rf %s" % outmosaic)
                         
-                    ncores = 2
+                    ncores = 8
                     command = "mpirun -np %i %s 1 1 %i %s %s" % (ncores, crblasterpath, ncores, inmosaic, outmosaic)
                     print command
                     os.system(command)
