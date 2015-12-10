@@ -349,7 +349,11 @@ if dodetrend:
 
                     # run sextractor
                     background = filename.replace(".fits", "_background-%03i.fits" % backsize)
-                    command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (filename, filename, backsize, background)
+                    out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
+                    if out_sys==0 :
+						command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (filename, filename, backsize, background)
+                    else :
+						command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (filename, filename, backsize, background)
                     print command
                     os.system(command)
     
@@ -1007,7 +1011,11 @@ rs2Dstars = np.array(np.sqrt((Xstars - (npsf + nf - 1.) / 2.)**2 + (Ystars - (np
 if doconvolve:
 
     # run sextractor on original image to remove background
-    command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
+    out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
+    if out_sys==0 :
+	    command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
+    else :
+		command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
     print command
     os.system(command)
     datareforig = np.array(dataref)
@@ -1037,7 +1045,11 @@ if doconvolve:
     noise.writeto(filename.replace(".fits", "_noise.fits"), clobber = True)
 
     # run sextractor on projected image
-    command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -VERBOSE_TYPE QUIET" % (filename, filename, backsize)
+    out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
+    if out_sys==0 :
+	    command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -VERBOSE_TYPE QUIET" % (filename, filename, backsize)
+    else :
+		command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -VERBOSE_TYPE QUIET" % (filename, filename, backsize)
     print command
     os.system(command)
     
