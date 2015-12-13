@@ -1,5 +1,29 @@
 #!/usr/bin/python2.7
 
+'''
+IMPORTANT notes about the portability of this code.
+
+Programs to install:
+    - Python 2.7 and all the packages imported in this code
+    - SExtractor (http://www.astromatic.net/software/sextractor)
+        the current version of the code support any version of SExtractor, including SExtractor 2.8.6 and older, where the command
+        line to run it is 'sextractor' and not 'sex', as for more recent versions.
+    - crblaster (http://www.noao.edu/noao/staff/mighell/crblaster/)
+    - mpirun (the installation of the package including this utility depends on the operating system)
+            
+Things to do before running the code:
+    1. create a symbolic link to your local path to DATA (where input and output data are stored) and name it "DATA"
+    2. create a symbolic link to your local folder where crblast executable file is stored and name it "crblasterpath"
+    3. set the environment variable NUMBER_OF_CORES=<ncores>, where <ncores> is the number of CPU cores of your computer.
+       This can be done in two ways (bash shell):
+           - run the code as explained in the help, but prepending the environment variable assignment, 
+             e.g. NUMBER_OF_CORES=4 python doreduceSOI.py --filter g --supernova Bel --obsdate 20140324 --order 3 --detrend --mosaic --convolve --photometry
+           - store permanently the environment variable by adding the line
+             export NUMBER_OF_CORES=<ncores>
+             to any current shell profile file as ~/.bashrc or ~/.profile 
+       The code assignes by default ncores=1 if no environment variable is defined      
+'''
+
 import os
 import re # use regular patterns
 import sys, getopt # system commands
