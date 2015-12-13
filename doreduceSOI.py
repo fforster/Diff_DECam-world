@@ -655,6 +655,11 @@ MJDref = headerref['MJD-OBS']
 (nx1, ny1) = np.shape(dataref)
 
 if domosaic:
+	
+    ncores = os.environ.get ('NUMBER_OF_CORES')    # set the number of cores through an environment variable
+    if ncores==None : 
+        ncores = 1
+    print '\nnumber of cores =', ncores
 
     final = np.zeros(np.shape(dataref))
     finalbg = np.zeros(np.shape(dataref))
@@ -931,8 +936,7 @@ if domosaic:
                     if os.path.exists(outmosaic):
                         os.system("rm -rf %s" % outmosaic)
                         
-                    ncores = 8
-                    command = "mpirun -np %i %s 1 1 %i %s %s" % (ncores, crblasterpath, ncores, inmosaic, outmosaic)
+                    command = "mpirun -np %s %s 1 1 %s %s %s" % (ncores, crblasterpath, ncores, inmosaic, outmosaic)
                     print command
                     os.system(command)
                     
