@@ -42,8 +42,14 @@ from conv2fast import conv2fast
 
 from astropy.io import fits
 
-projfast.set_num_threads(4)
-conv2fast.set_num_threads(4)
+# set the number of cores through an environment variable
+ncores = os.environ.get ('NUMBER_OF_CORES')    
+if ncores==None : 
+    ncores = 1
+print '\nnumber of cores =', ncores
+
+projfast.set_num_threads(ncores)
+conv2fast.set_num_threads(ncores)
 
 download = False
 dodetrend = False
@@ -680,11 +686,6 @@ MJDref = headerref['MJD-OBS']
 
 if domosaic:
 	
-    ncores = os.environ.get ('NUMBER_OF_CORES')    # set the number of cores through an environment variable
-    if ncores==None : 
-        ncores = 1
-    print '\nnumber of cores =', ncores
-
     final = np.zeros(np.shape(dataref))
     finalbg = np.zeros(np.shape(dataref))
     nmosaic = np.zeros(np.shape(dataref), dtype = int)
