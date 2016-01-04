@@ -5,6 +5,7 @@ IMPORTANT notes about the portability of this code.
 
 Programs to install:
     - Python 2.7 and all the packages imported in this code
+    - F2PY fortran to python interface generator 
     - SExtractor (http://www.astromatic.net/software/sextractor)
         the current version of the code support any version of SExtractor, including SExtractor 2.8.6 and older, where the command
         line to run it is 'sextractor' and not 'sex', as for more recent versions.
