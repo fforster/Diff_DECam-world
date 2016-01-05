@@ -20,11 +20,24 @@ import numpy as np
 from astropy.io import fits
 
 
-def DECamSNlist (file2014='SNHiTS2014.dat') :
+def DECamSNlist (file2014='SNHiTS2014.dat', file2015='SNHiTS2015.dat') :
 	
 	# load list of DECam SNe
-	SN, field, CCD, icoord, jcoord = np.loadtxt (file2014, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7), unpack=True)
-	# NOTE: epoch is missing in file2014!!! #
+	mat = np.loadtxt (file2014, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7))
+	SN = mat[:,0]
+	field = mat[:,1]
+	CCD = mat[:,2]
+	icoord = mat[:,3]
+	jcoord = mat[:,4]
+	print SN
+	mat = np.loadtxt (file2015, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7))
+	SN = np.hstack((SN,mat[:,0]))
+	field = np.hstack((field,mat[:,1]))
+	CCD = np.hstack((CCD,mat[:,2]))
+	icoord = np.hstack((icoord,mat[:,3]))
+	jcoord = np.hstack((jcoord,mat[:,4]))
+	print SN
+	# NOTE: epoch is missing in file2014 and file2015!!! #
 	
 	# make a dictionary	
 	d = {}
@@ -43,7 +56,7 @@ def InstrSNlist (instr, obsdate) :
 	if instr == 'DuPont' :
 		instrdir = os.path.join ('DATA', instr)
 	elif instr == 'SOI' :
-	    instrdir = os.path.join ('DATA', 'SOAR', instr)	
+	    instrdir = os.path.join ('DATA', 'SOAR', instr)
 	else :
 		sys.exit('instrument name is incorrect!')	
 	
@@ -70,18 +83,28 @@ def InstrSNlist (instr, obsdate) :
 	# open the obsdate file and write the headline
 	outfile = os.path.join(outdir, '%s.dat' %obsdir[nchar1:])
 	with open(outfile,'wb') as outf:
-		outf.write(b'# FILENAME OBJECT RA DEC FILTER1 FILTER2 AIRMASS EXPTIME\n')
+		if instr == 'DuPont' :
+			outf.write(b'# FILENAME OBJECT RA DEC FILTER AIRMASS EXPTIME\n')
+		else :
+		    outf.write(b'# FILENAME OBJECT RA DEC FILTER1 FILTER2 AIRMASS EXPTIME\n')
 	
 	SNlist = []
 		
 	for f in files :
 		# open the header
-		HDU = fits.open(f)
+		try :
+		    HDU = fits.open(f)
+		except IOError :
+			pass
 		priHDU = HDU[0].header
 		# write header values into file
 		with open (outfile,'a') as outf:
-			outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(f[nchar2:], priHDU['OBJECT'], 
-			priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))
+			if instr == 'DuPont' :
+			    outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(f[nchar2:], priHDU['OBJECT'], 
+			    priHDU['RA'], priHDU['DEC'], priHDU['FILTER'], priHDU['AIRMASS'], priHDU['EXPTIME']))
+			else :
+				outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(f[nchar2:], priHDU['OBJECT'], 
+				priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))
 		# make a list of SN available with given instr and at given obsdate
 		if priHDU['OBJECT'] not in SNlist :
 			SNlist.append (priHDU['OBJECT'])
