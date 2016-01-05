@@ -1,13 +1,17 @@
 #!/usr/bin/python2.7
 
 '''
-This code is made of ??? functions:
-InstrSNlist 
-    reads DuPont and SOI fits file and write tables of some header elements into files saved in obsdate folders.
-DECamSNlist
-    reads the full list of HiTS SNe from 2014 and 2015 and make a dictionary where the key elements are SN nicknames   
+This code is made of one function that checks the availability of HiTS SN data on local disk.
+A main function ifSNdataexist does it by calling other two functions:
+- DECamSNlist
+      reads the full list of HiTS SNe from 2014 and 2015 and make a dictionary where the key elements are SN nicknames
+- InstrSNlist 
+      reads DuPont and SOI fits file and write tables of some header elements into files saved in obsdate folders.
+
+Note: this code can be implemented by downloading data of not available SN, i.e. passing (field, CCD, epoch) to filldata.py  
 '''
 
+### IMPORTANT: SOLVE THE ISSUE WITH EPOCH. SOLVE THE ISSUE WITH UPPERCASE (ELISE)
 
 import os
 import glob    # module to find pathnames
@@ -104,7 +108,7 @@ def ifSNdataexist (SN, instr, obsdate, file2014='SNHiTS2014.dat') :
 			# check if path exists
 			sndir = os.path.join(refdir, DECamSN[SN][0], DECamSN[SN][1]) 
 	        if os.path.isdir(sndir) :
-				print 'Following files of SN with nickname %s are available in DECam folder\n%s\n' %(SN,sndir)
+				print 'Following files of SN with nickname %s are available in local folder %s' %(SN,sndir)
 				for f in os.listdir(sndir) :
 					print f
 	        else :
@@ -114,9 +118,9 @@ def ifSNdataexist (SN, instr, obsdate, file2014='SNHiTS2014.dat') :
 	    if DECamSN.has_key(sn) :        
 	        sndir = os.path.join(refdir, DECamSN[sn][0], DECamSN[sn][1]) 
 	        if os.path.isdir(sndir) :
-				print 'Data of SN with nickname %s are available in DECam folder\n%s' %(sn,sndir)
+				print '%s SN data --> available in %s' %(sn,sndir)
             else :
-				print 'Data of SN with nickname %s are NOT available' %sn
+				print '%s SN data --> NOT available' %sn
 	
 	
 if __name__ == "__main__" :
