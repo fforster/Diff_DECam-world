@@ -22,29 +22,29 @@ from astropy.io import fits
 
 def DECamSNlist (file2014='SNHiTS2014.dat', file2015='SNHiTS2015.dat') :
 	
-	# load list of DECam SNe
-	mat = np.loadtxt (file2014, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7))
-	SN = mat[:,0]
-	field = mat[:,1]
-	CCD = mat[:,2]
-	icoord = mat[:,3]
-	jcoord = mat[:,4]
-	mat = np.loadtxt (file2015, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7))
-	SN = np.hstack((SN,mat[:,0]))    
-	field = np.hstack((field,mat[:,1]))
-	CCD = np.hstack((CCD,mat[:,2]))
-	icoord = np.hstack((icoord,mat[:,3]))
-	jcoord = np.hstack((jcoord,mat[:,4]))
+    # load list of DECam SNe
+    mat = np.loadtxt (file2014, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7))
+    SN = mat[:,0]
+    field = mat[:,1]
+    CCD = mat[:,2]
+    icoord = mat[:,3]
+    jcoord = mat[:,4]
+    mat = np.loadtxt (file2015, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7))
+    SN = np.hstack((SN,mat[:,0]))    
+    field = np.hstack((field,mat[:,1]))
+    CCD = np.hstack((CCD,mat[:,2]))
+    icoord = np.hstack((icoord,mat[:,3]))
+    jcoord = np.hstack((jcoord,mat[:,4]))
 	# NOTE: epoch is missing in file2014 and file2015!!! #
 	
 	# make a dictionary	
-	d = {}
-	for i in range(len(SN)) :
-		SN[i] = SN[i].replace(" ","")
-		d[SN[i].upper()] = ['Blind14A-P_%s' %field[i], CCD[i], [int(icoord[i]), int(jcoord[i])]]
-	#print d
+    d = {}
+    for i in range(len(SN)) :
+        SN[i] = SN[i].replace(" ","")
+        d[SN[i].upper()] = ['Blind14A-P_%s' %field[i], CCD[i], [int(icoord[i]), int(jcoord[i])]]
+    #print d
 			
-	return d
+    return d
 
 
 def InstrSNlist (instr, obsdate) :
@@ -99,16 +99,16 @@ def InstrSNlist (instr, obsdate) :
         # write header values into file
         with open (outfile,'a') as outf:
             if instr == 'DuPont' :
-                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(f[nchar2:], priHDU['OBJECT'].upper(), 
+                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(f[nchar2:], priHDU['OBJECT'], 
                 priHDU['RA'], priHDU['DEC'], priHDU['FILTER'], priHDU['AIRMASS'], priHDU['EXPTIME']))
             else :
-                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(f[nchar2:], priHDU['OBJECT'].upper(), 
+                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(f[nchar2:], priHDU['OBJECT'], 
                 priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))
         # make a list of SN available for given instr and at given obsdate
-        objname = priHDU['OBJECT'].replace(' ','')
-        objname = objname.upper()
-        if objname[-2] == '_' :
-			objname = objname[:-2]		
+        objname = priHDU['OBJECT'].upper()
+        objname = objname.replace(' ','')
+        if (objname != '') and (objname[-2] == '_') :
+            objname = objname[:-2]		
         if objname not in SNlist :
             SNlist.append(objname)
     #print SNlist
