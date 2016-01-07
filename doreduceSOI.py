@@ -199,8 +199,8 @@ CCDSOAR = 2
 filters = {'g': 's0011 g SDSS', 'r': 's0012 r SDSS'}
 
 # output directory
-indir = 'DATA/SOAR/SOI/%s' % obsdate
-outdir = "%s/OUT" % indir
+indir = os.path.join('DATA','SOAR','SOI',obsdate)
+outdir = os.path.join(indir,'OUT',supernova)
 if not os.path.exists(outdir):
     os.makedirs(outdir)
 
