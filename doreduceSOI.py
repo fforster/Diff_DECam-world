@@ -47,7 +47,6 @@ from astropy.io import fits
 ncores = os.environ.get ('NUMBER_OF_CORES')    
 if ncores==None : 
     ncores = 1
-print '\nnumber of cores =', ncores
 
 projfast.set_num_threads(ncores)
 conv2fast.set_num_threads(ncores)
@@ -101,6 +100,10 @@ for opt, arg in opts:
         doconvolve = True
     elif opt in ('-p', '--photometry'):
         dophotometry = True
+
+print "\nSTARTING DOREDUCE CODE...\n"
+
+print '\nnumber of cores = %s\n' %ncores
 
 # other options
 dotrim = True
@@ -217,7 +220,9 @@ files = os.listdir(indir)
 
 # file calibration
 if dodetrend:
-
+    
+    print "\nSTARTING DETREND...\n"
+    
     # initialize bias and flats
     for i in range(4):
         exec("zero%i = None" % (i + 1))
@@ -687,6 +692,8 @@ MJDref = headerref['MJD-OBS']
 
 if domosaic:
 	
+    print "\nSTARTING MOSAIC...\n"
+	
     final = np.zeros(np.shape(dataref))
     finalbg = np.zeros(np.shape(dataref))
     nmosaic = np.zeros(np.shape(dataref), dtype = int)
@@ -1039,6 +1046,8 @@ Xstars, Ystars = np.meshgrid(np.array(range(npsf + nf)), np.array(range(npsf + n
 rs2Dstars = np.array(np.sqrt((Xstars - (npsf + nf - 1.) / 2.)**2 + (Ystars - (npsf + nf - 1.) / 2.)**2))
 
 if doconvolve:
+	
+    print "\nSTARTING CONVOLVE...\n"
 
     # run sextractor on original image to remove background
     out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
@@ -1372,7 +1381,9 @@ if doconvolve:
     np.save(filename.replace(".fits", "_solfilter.npy"), solfilter)
     
 if dophotometry:
-
+    
+    print "\nSTARTING PHOTOMETRY...\n"
+     
     # filename
     filename = "%s/%s_%s_%02i_nosky_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, order)
     MJD = float(fits.open(filename)[0].header['MJD-OBS'])
