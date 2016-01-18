@@ -23,25 +23,26 @@ from astropy.io import fits
 def DECamSNlist (file2014='SNHiTS2014.dat', file2015='SNHiTS2015.dat') :
 	
     # load list of DECam SNe
-    mat = np.loadtxt (file2014, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7))
+    mat = np.loadtxt (file2014, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7,8))
     SN = mat[:,0]
     field = mat[:,1]
     CCD = mat[:,2]
-    icoord = mat[:,3]
-    jcoord = mat[:,4]
-    mat = np.loadtxt (file2015, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7))
+    epoch = mat[:,3]
+    icoord = mat[:,4]
+    jcoord = mat[:,5]
+    mat = np.loadtxt (file2015, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7,8))
     SN = np.hstack((SN,mat[:,0]))    
     field = np.hstack((field,mat[:,1]))
     CCD = np.hstack((CCD,mat[:,2]))
-    icoord = np.hstack((icoord,mat[:,3]))
-    jcoord = np.hstack((jcoord,mat[:,4]))
-	# NOTE: epoch is missing in file2014 and file2015!!! #
-	
+    epoch = np.hstack((epoch,mat[:,3]))
+    icoord = np.hstack((icoord,mat[:,4]))
+    jcoord = np.hstack((jcoord,mat[:,5]))
+		
 	# make a dictionary	
     d = {}
     for i in range(len(SN)) :
         SN[i] = SN[i].replace(" ","")
-        d[SN[i].upper()] = ['Blind14A-P_%s' %field[i], CCD[i], [int(icoord[i]), int(jcoord[i])]]
+        d[SN[i].upper()] = ['Blind14A_%s' %field[i], CCD[i], epoch[i], [int(icoord[i]), int(jcoord[i])]]
     #print d
 			
     return d
