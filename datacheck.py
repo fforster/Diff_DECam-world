@@ -17,32 +17,42 @@ import os
 import glob    # module to find pathnames
 import sys
 import numpy as np 
+import datetime as dt    # class for manipulating date and time
 from astropy.io import fits
+from astropy import units as u
+from astropy.coordinates import SkyCoord, match_coordinates_sky    # classes for matching catalogs by coordinates 
 
 
 def DECamSNlist (file2014='SNHiTS2014.dat', file2015='SNHiTS2015.dat') :
 	
     # load list of DECam SNe
-    mat = np.loadtxt (file2014, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7,8))
+    mat = np.loadtxt (file2014, dtype='string', delimiter='\t', skiprows=2, usecols=(0,2,3,4,5,6,7,8))
     SN = mat[:,0]
-    field = mat[:,1]
-    CCD = mat[:,2]
-    epoch = mat[:,3]
-    icoord = mat[:,4]
-    jcoord = mat[:,5]
-    mat = np.loadtxt (file2015, dtype='string', delimiter='\t', skiprows=2, usecols=(1,4,5,6,7,8))
-    SN = np.hstack((SN,mat[:,0]))    
-    field = np.hstack((field,mat[:,1]))
-    CCD = np.hstack((CCD,mat[:,2]))
-    epoch = np.hstack((epoch,mat[:,3]))
-    icoord = np.hstack((icoord,mat[:,4]))
-    jcoord = np.hstack((jcoord,mat[:,5]))
+    ra = mat[:,1]
+    dec = mat[:,2]
+    field = mat[:,3]
+    CCD = mat[:,4]
+    epoch = mat[:,5]
+    icoord = mat[:,6]
+    jcoord = mat[:,7]
+    mat = np.loadtxt (file2015, dtype='string', delimiter='\t', skiprows=2, usecols=(0,2,3,4,5,6,7,8))
+    SN = np.hstack((SN,mat[:,0])) 
+    ra = np.hstack((ra,mat[:,1]))
+    dec = np.hstack((dec,mat[:,2]))   
+    field = np.hstack((field,mat[:,3]))
+    CCD = np.hstack((CCD,mat[:,4]))
+    epoch = np.hstack((epoch,mat[:,5]))
+    icoord = np.hstack((icoord,mat[:,6]))
+    jcoord = np.hstack((jcoord,mat[:,7]))
 		
 	# make a dictionary	
     d = {}
     for i in range(len(SN)) :
-        SN[i] = SN[i].replace(" ","")
-        d[SN[i].upper()] = ['Blind14A_%s' %field[i], CCD[i], epoch[i], [int(icoord[i]), int(jcoord[i])]]
+        ### old issue with sn nickname syntax
+        #SN[i] = SN[i].replace(" ","")
+        #d[SN[i].upper()] = ['Blind14A_%s' %field[i], CCD[i], epoch[i], [int(icoord[i]), int(jcoord[i])]]
+        ##################################
+        d[SN[i]] = [ra[i], dec[i], 'Blind14A_%s' %field[i], CCD[i], epoch[i], [int(icoord[i]), int(jcoord[i])]]
     #print d
 			
     return d
@@ -81,13 +91,17 @@ def InstrSNlist (instr, obsdate) :
     files = sorted(glob.glob(pathname))
     # open the obsdate file and write the headline
     outfile = os.path.join(outdir, '%s.dat' %obsdir[nchar1:])
+    print ('\nWriting into %s' %outfile)
     with open(outfile,'wb') as outf:
         if instr == 'DuPont' :
             outf.write(b'# FILENAME OBJECT RA DEC FILTER AIRMASS EXPTIME\n')
         else :
             outf.write(b'# FILENAME OBJECT RA DEC FILTER1 FILTER2 AIRMASS EXPTIME\n')
     
-    SNlist = []
+    # writing the obsdate file and returning lists of fits, ra and dec
+    list_of_fits = []
+    ra = []
+    dec = []
 		
     for f in files :
         # open the fits
@@ -105,55 +119,61 @@ def InstrSNlist (instr, obsdate) :
             else :
                 outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(f[nchar2:], priHDU['OBJECT'], 
                 priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))
-        # make a list of SN available for given instr and at given obsdate
-        objname = priHDU['OBJECT'].upper()
-        objname = objname.replace(' ','')
-        if (objname != '') and (objname[-2] == '_') :
-            objname = objname[:-2]		
-        if objname not in SNlist :
-            SNlist.append(objname)
-    #print SNlist
-
-    return SNlist
+        # make a list of fits available for given instr and at given obsdate
+        list_of_fits.append(f)
+        ra.append(priHDU['RA'])
+        dec.append(priHDU['DEC'])
+        
+    return list_of_fits, ra, dec
 
 
-def ifSNdataexist (SN, instr, obsdate, file2014='SNHiTS2014.dat', file2015='SNHiTS2015.dat') :
+def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='SNHiTS2015.dat') :
 	
-    SN = SN.upper()    # Note: upper/lowercase inconsistency solved everywhere in the code
-	
-    refdir = os.path.join('DATA', 'DATA_CMMPIPE')
-    # check if sn exist or data are available 
+    # load the dictionary of DECam SNe 
     SNdict = DECamSNlist(file2014, file2015)
-    if SNdict.has_key(SN) :
-        SNlist = InstrSNlist(instr, obsdate)
-        print '\nChecking whether DECam data for %s are available...\n' %SN
-        if SN in SNlist :
-            # check if path exists
-            sndir = os.path.join(refdir, SNdict[SN][0], SNdict[SN][1])
-            if os.path.isdir(sndir) :
-                print '\nFollowing files of %s are available in the local folder %s' %(SN,sndir)
-                for f in os.listdir(sndir) :
-                    print f
-            else :
-                print 'DECam reference image not available'
+    SN = []
+    raDECam = []
+    decDECam = []
+    for sn, val in SNdict.iteritems() :
+        SN.append(sn)
+        raDECam.append(val[0])
+        decDECam.append(val[1]) 
+    SN = np.array(SN)
+    raDECam = np.array(raDECam)
+    decDECam = np.array(decDECam)
+    # load fits files and their coordinates at obsdate 
+    fitsfile, raSOI, decSOI = InstrSNlist (instr, obsdate)
+    fitsfile = np.array(fitsfile)
+    raSOI = np.array(raSOI)
+    decSOI = np.array(decSOI)
+    
+    # search matching coordinates around a separation of 1 arcsecond
+    c = SkyCoord (ra=raSOI, dec=decSOI, unit=(u.hourangle, u.deg))
+    catalog = SkyCoord (ra=raDECam, dec=decDECam, unit=(u.hourangle, u.deg))
+    idxc, idxcatalog, d2d, d3d = catalog.search_around_sky(c, 1*u.arcmin)
+                
+    # updating OBJECT card in fits file headers with SNHiTS name
+    date = dt.date.today().strftime('%m/%d/%Y')
+    print ('\nUpdating fits file headers on %s...' %date)
+    i = 0
+    for f in fitsfile[idxc] :    # loop only on the list of files that must be updated
+        HDU = fits.open(f, mode='update')    # open the fits (they are already selected without IOError)
+        priHDU = HDU[0].header
+        newname = SN[idxcatalog[i]]
+        if priHDU['OBJECT'] != newname :
+            print ('\nWriting %s into %s ...' %(newname, f))
+            priHDU.set ('OBJ_OLD', priHDU['OBJECT'], 'object name given during the observation', after='OBJECT')
+            priHDU.set ('OBJECT', newname, 'object name updated on %s' %date)
+            #priHDU.add_history('header updated on %s' %date)
         else :
-            print '%s was not observed in the observation date %s' %(SN,obsdate)
-    else :
-        sys.exit('%s does not correspond to any valid HiTS SN!' %SN)
-    # check which of the SN observed at obsdate are available in DECam data
-    print '\nChecking DECam data available for the other SNe observed with %s in %s...\n' %(instr,obsdate)
-    for sn in SNlist :   
-        if SNdict.has_key(sn) :        
-            sndir = os.path.join(refdir, SNdict[sn][0], SNdict[sn][1]) 
-            if os.path.isdir(sndir) :
-                print '%s SN data --> available in %s' %(sn,sndir)
-            else :
-                print '%s SN data --> NOT available' %sn
-	
+            print ('\nSkipping %s ...' %f)
+        HDU.close()
+        i += 1
+
 	
 if __name__ == "__main__" :
     
-    ifSNdataexist (sys.argv[1], sys.argv[2], sys.argv[3])
+    check_by_coordinates (sys.argv[1], sys.argv[2])
     
 
 #gethead image* OBJECT RA DEC FILTER1 FILTER2 AIRMASS EXPTIME
