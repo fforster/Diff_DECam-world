@@ -37,11 +37,14 @@ from scipy import ndimage
 from scipy import signal as scipysignal
 from pylab import *
 from astropy.time import Time # new date conversion
+from astropy.io import fits
+
+from datacheck import DECamSNlist    # to load SNHiTS dictionary
 
 from projection import projfast
 from conv2fast import conv2fast
 
-from astropy.io import fits
+
 
 # set the number of cores through an environment variable
 ncores = os.environ.get ('NUMBER_OF_CORES')    
@@ -77,7 +80,7 @@ for opt, arg in opts:
         print "-m --mosaic: create SOI image mosaic based on the available data"
         print "-c --convolve: compute kernel, projection and image convolution"
         print "-p --photometry: do photometry"
-        print "e.g. python doreduceSOI.py --filter g --supernova Bel --obsdate 20140324 --order 3 --detrend --mosaic --convolve --photometry"
+        print "e.g. python doreduceSOI.py --filter g --supernova SNHiTS14A --obsdate 20140324 --order 3 --detrend --mosaic --convolve --photometry"
         sys.exit()
     elif opt in ('-f', '--filter'):
         filter = arg
@@ -124,71 +127,13 @@ npix = 0.265 / 0.155
 # open and plot reference image
 
 refdir = 'DATA/DATA_CMMPIPE'
-if supernova == 'Bel':
-    field = 'Blind14A-P_10'
-    CCD = 'N6'
-    epoch = '02'
-    coords = [2808, 986]
-elif supernova == 'Dana':
-    field = 'Blind14A-P_08'
-    CCD = 'N28'
-    epoch = '02'
-    coords = [274, 352]
-elif supernova == 'Greta':
-    field = 'Blind14A-P_30'
-    CCD = 'S31'
-    epoch = '02'
-    coords = [211, 1308]
-elif supernova == 'Elise':
-    field = 'Blind14A-P_04'
-    CCD = 'S23'
-    epoch = '02'
-    coords = [1682, 1588]
-elif supernova == 'Emilia':
-    field = 'Blind14A-P_37'
-    CCD = 'N30'
-    epoch = '02'
-    coords = [1187, 1705]
-elif supernova == 'Kora':
-    field = 'Blind14A-P_01'
-    CCD = 'S23'
-    epoch = '03'
-    coords = [1840, 2159]
-elif supernova == 'Laura':
-    field = 'Blind14A-P_27'
-    CCD = 'N31'
-    epoch = '02'
-    coords = [107, 1466]
-elif supernova == 'Mara':
-    field = 'Blind14A-P_07'
-    CCD = 'N17'
-    epoch = '02'
-    coords = [848, 721]
-elif supernova == 'Pamela':
-    field = 'Blind14A-P_16'
-    CCD = 'S13'
-    epoch = '02'
-    coords = [3793, 597]
-elif supernova == 'Catalina':
-    field = 'Blind14A-P_01'
-    CCD = 'S19'
-    epoch = '03'
-    coords = [2726, 1574]
-elif supernova == 'Farah':
-    field = 'Blind14A-P_26'
-    CCD = 'N11'
-    epoch = '02'
-    coords = [2744, 388]
-elif supernova == 'Milena':
-    field = 'Blind14A-P_09'
-    CCD = 'N4'
-    epoch = '02'
-    coords = [1021, 201]
-elif supernova == 'Nala':
-    field = 'Blind14A-P_08'
-    CCD = 'N21'
-    epoch = '02'
-    coords = [1407, 113]
+
+SNdict = DECamSNlist ()
+if supernova in SNdict :
+    field = SNdict[supernova][2]
+    CCD = SNdict[supernova][3]
+    epoch = SNdict[supernova][4]
+    coords = SNdict[supernova][5]
 else:
     print "WARNING: supernova %s not in the list of valid supernova" % supernova
     sys.exit()
@@ -348,7 +293,7 @@ if dodetrend:
     
             if filteri1 == "s0000 Open" and filteri2 == filters[filter]:
      
-                if obj.lower() != supernova.lower():
+                if obj != supernova:
                     continue
     
                 print "\nImage", i, filter, "obj:", obj
@@ -721,7 +666,7 @@ if domosaic:
         
             if filteri1 == "s0000 Open" and filteri2 == filters[filter]:
          
-                if obj.lower() != supernova.lower():
+                if obj != supernova:
                     continue
     
                 print "\n\nImage", i, filter, "obj:", obj
