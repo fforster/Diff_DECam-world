@@ -187,6 +187,9 @@ if dodetrend:
                 for iCCD in range(4):
                     zero = obs[iCCD + 1].data
                     if dotrim:
+						# correct fits keyword value for DATASEC (slides from instrumet scientist Sean Points)
+						# l1, l2, l3, l4 = 29, 540, 1, 2048
+						# read fits keyword value for DATASEC
                         datasec = obs[iCCD + 1].header['DATASEC']
                         (l1, l2, l3, l4) = re.findall("\[(\d+):(\d+),(\d+):(\d+)\]", datasec)[0]
                         zero = zero[int(l3) - 1: int(l4), int(l1) - 1: int(l2)]
@@ -198,6 +201,9 @@ if dodetrend:
                 for iCCD in range(4):
                     zero = obs[iCCD + 1].data
                     if dotrim:
+						# correct fits keyword value for DATASEC (slides from instrumet scientist Sean Points)
+						# l1, l2, l3, l4 = 29, 540, 1, 2048
+						# read fits keyword value for DATASEC
                         datasec = obs[iCCD + 1].header['DATASEC']
                         (l1, l2, l3, l4) = re.findall("\[(\d+):(\d+),(\d+):(\d+)\]", datasec)[0]
                         zero = zero[int(l3) - 1: int(l4), int(l1) - 1: int(l2)]
@@ -238,6 +244,9 @@ if dodetrend:
                             continue
                         exptime = float(obs[0].header['EXPTIME'])
                         if dotrim:
+							# correct fits keyword value for DATASEC (slides from instrumet scientist Sean Points)
+						    # l1, l2, l3, l4 = 29, 540, 1, 2048
+						    # read fits keyword value for DATASEC
                             datasec = obs[iCCD + 1].header['DATASEC']
                             (l1, l2, l3, l4) = re.findall("\[(\d+):(\d+),(\d+):(\d+)\]", datasec)[0]
                             flat = flat[int(l3) - 1: int(l4), int(l1) - 1: int(l2)]
@@ -253,6 +262,9 @@ if dodetrend:
                             print "Skipping saturated flat..."
                             continue
                         if dotrim:
+							# correct fits keyword value for DATASEC (slides from instrumet scientist Sean Points)
+						    # l1, l2, l3, l4 = 29, 540, 1, 2048
+						    # read fits keyword value for DATASEC
                             datasec = obs[iCCD + 1].header['DATASEC']
                             (l1, l2, l3, l4) = re.findall("\[(\d+):(\d+),(\d+):(\d+)\]", datasec)[0]
                             flat = flat[int(l3) - 1: int(l4), int(l1) - 1: int(l2)]
@@ -305,6 +317,9 @@ if dodetrend:
 
                     image = obs[iCCD + 1].data
                     if dotrim:
+						# correct fits keyword value for DATASEC (slides from instrumet scientist Sean Points)
+						# l1, l2, l3, l4 = 29, 540, 1, 2048
+						# read fits keyword value for DATASEC
                         datasec = obs[iCCD + 1].header['DATASEC']
                         (l1, l2, l3, l4) = re.findall("\[(\d+):(\d+),(\d+):(\d+)\]", datasec)[0]
                         image = image[int(l3) - 1: int(l4), int(l1) - 1: int(l2)]
