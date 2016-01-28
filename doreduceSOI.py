@@ -61,8 +61,6 @@ doconvolve = False
 dophotometry = False
 obsdate = '20140324'
 
-doupper = True
-
 try:
     opts, args = getopt.getopt(sys.argv[1:], 'hfsondtmcp', ['help', 'filter=', 'supernova=', 'obsdate=', 'order=', 'download', 'detrend', 'mosaic', 'convolve', 'photometry'])
 except getopt.GetoptError:
@@ -140,8 +138,9 @@ else:
 
 print supernova
 
-# SOAR CCD which we want to project
-CCDSOAR = 2
+# SOAR CCDs to project
+# Note: two amplifiers for each detector, making a mosaic of four images
+CCDSOAR = ['amps12', 'amps34']
 
 # filters
 filters = {'g': 's0011 g SDSS', 'r': 's0012 r SDSS'}
@@ -169,9 +168,9 @@ if dodetrend:
     print "\nSTARTING DETREND...\n"
     
     # initialize bias and flats
-    for i in range(4):
-        exec("zero%i = None" % (i + 1))
-        exec("flat%i = None" % (i + 1))
+    for iCCD in range(4):
+        exec("zero%i = None" % (iCCD + 1))
+        exec("flat%i = None" % (iCCD + 1))
 
     # compute bias
 
@@ -312,8 +311,8 @@ if dodetrend:
 
                 for iCCD in range(4):
                     
-                    if iCCD + 1 != CCDSOAR:
-                        continue
+                    #if iCCD + 1 != CCDSOAR:
+                    #    continue
 
                     image = obs[iCCD + 1].data
                     if dotrim:
@@ -329,61 +328,86 @@ if dodetrend:
                     exec("image%i = (image - zero%i) / flat%i" % (iCCD + 1, iCCD + 1, iCCD + 1))
                     exec("obs[iCCD + 1].data = image%i" % (iCCD + 1))
                     exec("header = obs[%i].header" % (iCCD + 1))
-                    header.update('GAIN', 2.0)
+                    header.set('GAIN', 2.0)
                     delfields = ['NEXTEND', 'IMAGEID', 'DETSIZE', 'OFTDIR', 'WAT0_001', 'DATASEC', 'BIASSEC', 'CCDSEC', 'AMPSEC', 'TRIMSEC', 'DETSEC', 'CCDSIZE', 'NCCDS', 'NAMPS', 'TV1FOC', 'IMAGESWV', 'OFTDIR', 'XTALKFIL', 'RECNO', 'PREFLASH', 'RADECEQ', 'CCDNAME', 'AMPNAME', 'RDNOISE', 'SATURATE', 'AMPINTEG', 'BPM', 'WCSASTRM', 'EQUINOX', 'TELEQIN', 'WAT1_001', 'WAT1_002', 'WAT1_003', 'WAT1_004', 'WAT1_005', 'WAT2_001', 'WAT2_002', 'WAT2_003', 'WAT2_004', 'WAT2_005', 'CHECKSUM', 'DATASUM', 'CHECKVER']
                     for delfield in delfields:
                         try:
                             del header[delfield]
                         except:
                             print "Cannot delete field %s" % delfield
-                    header.update('CTYPE1', 'RA--TAN')
-                    header.update('CTYPE2', 'DEC--TAN')
+                    header.set('CTYPE1', 'RA--TAN')
+                    header.set('CTYPE2', 'DEC--TAN')
                     exec("obs%i = fits.PrimaryHDU(data = float32(image%i), header = header)" % (iCCD + 1, iCCD + 1))
                     filename = "%s/%s_%s_%02i_%04i.fits" % (outdir, obj, filter, iCCD + 1, ifile)
                     print "Saving file %s" % filename
                     exec("obs%i.writeto(\"%s\", clobber = True)" % (iCCD + 1, filename))
 
-                    # run sextractor
-                    background = filename.replace(".fits", "_background-%03i.fits" % backsize)
-                    out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
-                    if out_sys==0 :
-						command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (filename, filename, backsize, background)
-                    else :
-						command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (filename, filename, backsize, background)
-                    print command
-                    os.system(command)
-    
-                    # load catalogue
-                    try:
-                        (x, y, flux, e_flux, r, flag) = np.loadtxt("%s-catalogue.dat" % (filename), usecols = (1, 2, 5, 6, 8, 9)).transpose()
-                    except:
-                        print "Sextractor failed"
-                        continue
-    
-                    # plot image + catalogue
-                    if doplot:
-                        fig, ax = plt.subplots(3, 1, figsize = (17, 15))
-                        fig.subplots_adjust(wspace = 0, hspace = 0)
+                    # before running sextractor, we need to combine two amplifiers together. 
+                    # run sextractor for CCD1 and CCD2, i.e for obs1+obs2 and obs3+obs4.
+                    
+                    if (iCCD == 1) or (iCCD == 3) :
+						
+                        if (iCCD ==1) :    # combine AMP1 & AMP2 in CCDSOAR1
+                            newimage = np.vstack ((image2,image1))
+                            header.set('CCDNAME', 'CCD1')
+                            header.set('EXTNM', 'im1+im2')
+                            obs12 = fits.PrimaryHDU (data=float32(newimage), header=header)
+                            newname = filename.replace ('_02_', '_%s_' %CCDSOAR[0])
+                            print 'Saving combined images of AMP1 & AMP2 in\n--> %s' %newname
+                            obs12.writeto (newname, clobber=True)
+                        else :    # combine AMP3 & AMP4 in CCDSOAR2
+                            newimage = np.vstack ((image4,image3))
+                            header.set('CCDNAME', 'CCD2')
+                            header.set('EXTNM', 'im3+im4')
+                            obs34 = fits.PrimaryHDU (data=float32(newimage), header=header)
+                            newname = filename.replace ('_04_', '_%s_' %CCDSOAR[1])
+                            print 'Saving combined images of AMP3 & AMP4 in\n--> %s' %newname
+                            obs34.writeto (newname, clobber=True)
                         
-                        ax[0].scatter(x[flag <= 2], y[flag <= 2], marker = 'o', facecolors = 'none', color = 'white', s = 20 * r)
-                        ax[1].scatter(x[flag <= 2], y[flag <= 2], marker = 'o', facecolors = 'none', color = 'white',  s = 20 * r)
-                        ax[2].scatter(x[flag <= 2], y[flag <= 2], marker = 'o', facecolors = 'none', color = 'white', s = 20 * r)
+                        # run sextractor
+                        background = newname.replace(".fits", "_background-%03i.fits" % backsize)
+                        out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
+                        if out_sys==0 :
+					    	command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (newname, newname, backsize, background)
+                        else :
+					    	command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (newname, newname, backsize, background)
+                        print command
+                        os.system(command)
                         
-                        ax[0].scatter(x[flag <= 4], y[flag <= 4], marker = 'o', facecolors = 'none', color = 'y', s = 20 * r)
-                        ax[1].scatter(x[flag <= 4], y[flag <= 4], marker = 'o', facecolors = 'none', color = 'y', s = 20 * r)
-                        ax[2].scatter(x[flag <= 4], y[flag <= 4], marker = 'o', facecolors = 'none', color = 'y', s = 20 * r)
+                        # load catalogue
+                        try:
+                            (x, y, flux, e_flux, r, flag) = np.loadtxt("%s-catalogue.dat" % (newname), usecols = (1, 2, 5, 6, 8, 9)).transpose()
+                        except:
+                            print "Sextractor failed"
+                            continue
                         
-                        ax[1].scatter(x[flag > 4], y[flag > 4], marker = 'o', facecolors = 'none', color = 'r', s = 20 * r)
-                        ax[2].scatter(x[flag > 4], y[flag > 4], marker = 'o', facecolors = 'none', color = 'r', s = 20 * r)
-                        ax[0].scatter(x[flag > 4], y[flag > 4], marker = 'o', facecolors = 'none', color = 'r', s = 20 * r)
-                        
-                        image = fits.open(filename)[0].data
-                        ax[0].imshow(image, cmap = 'gray', interpolation = 'nearest', clim = (np.percentile(image.flatten(), 10), np.percentile(image.flatten(), 99)), origin = 'lower')
-                        bg = fits.open(background)[0].data
-                        image = image - bg
-                        ax[1].imshow(image, cmap = 'gray', interpolation = 'nearest', clim = (np.percentile(image.flatten(), 10), np.percentile(image.flatten(), 99)), origin = 'lower')
-                        ax[2].imshow(bg, cmap = 'gray', interpolation = 'nearest', origin = 'lower')
-                        plt.savefig("%s/%s_%s_%02i_%04i_nosky-%03i.png" % (outdir, obj, filter, iCCD + 1, ifile, backsize), bbox_inches = 'tight', dpi = 150)
+                        # plot image + catalogue
+                        if doplot:
+                            fig, ax = plt.subplots(3, 1, figsize = (17, 15))
+                            fig.subplots_adjust(wspace = 0, hspace = 0)
+                            
+                            ax[0].scatter(x[flag <= 2], y[flag <= 2], marker = 'o', facecolors = 'none', color = 'white', s = 20 * r)
+                            ax[1].scatter(x[flag <= 2], y[flag <= 2], marker = 'o', facecolors = 'none', color = 'white',  s = 20 * r)
+                            ax[2].scatter(x[flag <= 2], y[flag <= 2], marker = 'o', facecolors = 'none', color = 'white', s = 20 * r)
+                            
+                            ax[0].scatter(x[flag <= 4], y[flag <= 4], marker = 'o', facecolors = 'none', color = 'y', s = 20 * r)
+                            ax[1].scatter(x[flag <= 4], y[flag <= 4], marker = 'o', facecolors = 'none', color = 'y', s = 20 * r)
+                            ax[2].scatter(x[flag <= 4], y[flag <= 4], marker = 'o', facecolors = 'none', color = 'y', s = 20 * r)
+                            
+                            ax[1].scatter(x[flag > 4], y[flag > 4], marker = 'o', facecolors = 'none', color = 'r', s = 20 * r)
+                            ax[2].scatter(x[flag > 4], y[flag > 4], marker = 'o', facecolors = 'none', color = 'r', s = 20 * r)
+                            ax[0].scatter(x[flag > 4], y[flag > 4], marker = 'o', facecolors = 'none', color = 'r', s = 20 * r)
+                            
+                            image = fits.open(newname)[0].data
+                            ax[0].imshow(image, cmap = 'gray', interpolation = 'nearest', clim = (np.percentile(image.flatten(), 10), np.percentile(image.flatten(), 99)), origin = 'lower')
+                            bg = fits.open(background)[0].data
+                            image = image - bg
+                            ax[1].imshow(image, cmap = 'gray', interpolation = 'nearest', clim = (np.percentile(image.flatten(), 10), np.percentile(image.flatten(), 99)), origin = 'lower')
+                            ax[2].imshow(bg, cmap = 'gray', interpolation = 'nearest', origin = 'lower')
+                            if iCCD == 1 :
+                                plt.savefig("%s/%s_%s_%s_%04i_nosky-%03i.png" % (outdir, obj, filter, CCDSOAR[0], ifile, backsize), bbox_inches = 'tight', dpi = 150)
+                            else :                                                                     
+                                plt.savefig("%s/%s_%s_%s_%04i_nosky-%03i.png" % (outdir, obj, filter, CCDSOAR[1], ifile, backsize), bbox_inches = 'tight', dpi = 150)    
 
 else:
     
@@ -658,19 +682,19 @@ if domosaic:
     finalbg = np.zeros(np.shape(dataref))
     nmosaic = np.zeros(np.shape(dataref), dtype = int)
     
-    ifiles = []
+    #ifiles = []
     iMJDs = []
-
+    
     for i in sorted(files):
             
         if re.match("image.*?", i):
             
             filei = "%s/%s" % (indir, i)
             ifile = int(i[6:9])
-    
+            
             obs = fits.open(filei)
             header = obs[0].header
-        
+            
             filteri1 = header['FILTER1']
             filteri2 = header['FILTER2']
             obj = header['OBJECT']
@@ -678,302 +702,306 @@ if domosaic:
             MJD = Time(isotime).mjd
                 
             #print i, filteri1, filteri2, obj, filteri1 == "s0000 Open", filteri2 == filters[filter]
-        
+            
             if filteri1 == "s0000 Open" and filteri2 == filters[filter]:
-         
+                
                 if obj != supernova:
                     continue
-    
+                
                 print "\n\nImage", i, filter, "obj:", obj
-
-                ifiles.append(ifile)
+                
+                #ifiles.append(ifile)
                 iMJDs.append(MJD)
-
-                # open image to project
-                fitsnew = "%s/%s_%s_%02i_%04i.fits" % (outdir, obj, filter, CCDSOAR, ifile)
-                background = fitsnew.replace(".fits", "_background-%03i.fits" % backsize)
-                headernew = fits.open(fitsnew)[0].header
-                background = fits.open(background)[0].data
-                datanew = fits.open(fitsnew)[0].data - background
-                (nx2, ny2) = np.shape(datanew)
-    
-                # load sextractor sources
-                (x, y, flux, e_flux, r, flag) = np.loadtxt("%s/%s_%s_%02i_%04i.fits-catalogue.dat" % (outdir, obj, filter, CCDSOAR, ifile), usecols = (1, 2, 5, 6, 8, 9)).transpose()
-    
+                
                 # plot reference image
                 if doplot:
-                    fig, ax = plt.subplots()
+                    fig1, ax = plt.subplots()
                     ax.imshow(dataref, interpolation = 'nearest', cmap = 'gray', clim = (np.percentile(dataref, 1), np.percentile(dataref, 99)), origin = 'lower')
                     ax.scatter(xref[flagref <= 2], yref[flagref <= 2], marker = 'o', facecolors = 'none', color = 'y', s = 10, lw = 0.1)
-    
-                # Matching
-                # ---------------------
-                    
-                print "Looking for rough match..."
                 
-                # first guess
-                ibest = coords[1] - ny2 / npix / 2. 
-                jbest = coords[0] - nx2 / npix / 2.
-    
-                print "Refining solution to 25 pixels..."
-                (ibest, jbest) = roughastro(xref[flagref <= 4], x[flag <= 4] / npix, yref[flagref <=4], y[flag <= 4] / npix, ibest - 300, ibest + 300, jbest - 300, jbest + 300, 25)
-                
-                print "Refining solution to 5 pixels..."
-                (ibest, jbest) = roughastro(xref[flagref <= 4], x[flag <= 4] / npix, yref[flagref <=4], y[flag <= 4] / npix, ibest - 25, ibest + 25, jbest - 25, jbest + 25, 5)
-                
-                print "Refining solution to 2 pixels..."
-                (ibest, jbest) = roughastro(xref[flagref <= 4], x[flag <= 4] / npix, yref[flagref <=4], y[flag <= 4] / npix, ibest - 5, ibest + 5, jbest - 5, jbest + 5, 2)
-                
-                if doplot:
-                    ax.scatter(x[flag <= 4] / npix + ibest, y[flag <= 4] / npix + jbest, marker = 'o', facecolors = 'none', color = 'r', s = 10, lw = 0.2)
-                    figname = os.path.join(outdir,'imref.png')
-                    plt.savefig(figname, dpi = 400, bbox_inches = 'tight')
+                for pos,ccd in enumerate(CCDSOAR) :
                     
+                    # open image to project
+                    fitsnew = "%s/%s_%s_%s_%04i.fits" % (outdir, obj, filter, ccd, ifile)
+                    background = fitsnew.replace(".fits", "_background-%03i.fits" % backsize)
+                    headernew = fits.open(fitsnew)[0].header
+                    background = fits.open(background)[0].data
+                    datanew = fits.open(fitsnew)[0].data - background
+                    (nx2, ny2) = np.shape(datanew)
                     
-                # Linear transformation
-                # ---------------------------
+                    # load sextractor sources
+                    (x, y, flux, e_flux, r, flag) = np.loadtxt("%s/%s_%s_%s_%04i.fits-catalogue.dat" % (outdir, obj, filter, ccd, ifile), usecols = (1, 2, 5, 6, 8, 9)).transpose()
                     
-                # find intersection
-                (x1new, y1new, x2new, y2new) = intersect(xref[flagref <= 4], x[flag <= 4], yref[flagref <= 4], y[flag <= 4], ibest, jbest, npix)
-                
-                if doplot:
-                    # plot intersection in DECam coordinates before projection
-                    fig, ax = plt.subplots()
-                    for ipt in range(len(x1new)):
-                        ax.plot([x1new[ipt], x2new[ipt] / npix + ibest], [y1new[ipt], y2new[ipt] / npix + jbest], 'r')
-                    figname = os.path.join(outdir,"xy_match_DECam_o%i.png" % order)
-                    plt.savefig(figname)
-    
-                    # plot intersection in DECam coordinates before projection
-                    fig, ax = plt.subplots()
-                    ax.scatter(x1new - (x2new / npix + ibest), y1new - (y2new / npix + jbest), marker = '.') 
-                    figname = os.path.join(outdir,"xy_diff_DECam_o%i.png" % order)
-                    plt.savefig(figname)
-    
-                # solve linear transformation between two coordinate systems
-                if order == 0:
-                    trans = findshifttransformation(x1new, y1new, x2new, y2new)
-                if order == 1:
-                    trans = findlineartransformation(x1new, y1new, x2new, y2new)
-                elif order == 2:
-                    trans = find2ndordertransformation(x1new, y1new, x2new, y2new)
-                elif order == 3:
-                    trans = find3rdordertransformation(x1new, y1new, x2new, y2new)
-                if trans != None:
-                    if order == 0:
-                        (a11, b1, a22, b2) = trans
-                    if order == 1:
-                        (a11, a12, b1, a21, a22, b2) = trans
-                    elif order == 2:
-                        (a1, b11, b12, c1, d11, d12, a2, b21, b22, c2, d21, d22) = trans
-                    elif order == 3:
-                        (a1, b11, b12, c1, d11, d12, e1, f1, g11, g12, a2, b21, b22, c2, d21, d22, e2, f2, g21, g22) = trans
-                else:
-                    continue
-    
-                # transformed coordinates
-                if order == 0:
-                    x1t = b1 + a11 * x1new
-                    y1t = b2 + a22 * y1new
-                elif order == 1:
-                    x1t = b1 + a11 * x1new + a12 * y1new
-                    y1t = b2 + a21 * x1new + a22 * y1new
-                elif order == 2:
-                    x1t = a1 + b11 * x1new + b12 * y1new + c1 * x1new * y1new + d11 * x1new * x1new + d12 * y1new * y1new
-                    y1t = a2 + b21 * x1new + b22 * y1new + c2 * x1new * y1new + d21 * x1new * x1new + d22 * y1new * y1new
-                elif order == 3:
-                    x1t = a1 + b11 * x1new + b12 * y1new + c1 * x1new * y1new + d11 * x1new * x1new + d12 * y1new * y1new + e1 * x1new * x1new * y1new + f1 * x1new * y1new * y1new + g11 * x1new**3 + g12 * y1new**3
-                    y1t = a2 + b21 * x1new + b22 * y1new + c2 * x1new * y1new + d21 * x1new * x1new + d22 * y1new * y1new + e2 * x1new * x1new * y1new + f2 * x1new * y1new * y1new + g21 * x1new**3 + g22 * y1new**3
-                    
-                # plot intersection in SOAR coordinates after projection
-                if doplot:
-                    fig, ax = plt.subplots()
-                    for ipt in range(len(x1new)):
-                        ax.plot([x1t[ipt], x2new[ipt]], [y1t[ipt], y2new[ipt]], 'r')
-                    figname = os.path.join(outdir,"xy_match_SOAR_o%i.png" % order)
-                    plt.savefig(figname)
-
-                # remove outliers to refine solution
-                diffx = x1t - x2new
-                diffy = y1t - y2new
-                mask = (diffx >= np.percentile(diffx, 5)) & (diffx <= np.percentile(diffx, 95)) & (diffy >= np.percentile(diffy, 5)) & (diffy <= np.percentile(diffy, 95))
-                if order == 0 and np.sum(mask) < 2 or order == 1 and np.sum(mask) < 3 or order == 2 and np.sum(mask) < 6 or order == 3 and np.sum(mask) < 10:
-                    mask = (x1t == x1t)
-    
-                # plot transformed DECam coordinates in SOAR coordinates
-                if doplot:
-                    fig, ax = plt.subplots()
-                    ax.scatter(x1t - x2new, y1t - y2new, marker = '.', c = 'r')
-                    ax.scatter(x1t[mask] - x2new[mask], y1t[mask] - y2new[mask], marker = 'o', c = 'b')
-    
-                # solve new linear transformation between two coordinate systems
-                if order == 0:
-                    trans = findshifttransformation(x1new[mask], y1new[mask], x2new[mask], y2new[mask])
-                elif order == 1:
-                    trans = findlineartransformation(x1new[mask], y1new[mask], x2new[mask], y2new[mask])
-                elif order == 2:
-                    trans = find2ndordertransformation(x1new[mask], y1new[mask], x2new[mask], y2new[mask])
-                elif order == 3:
-                    trans = find3rdordertransformation(x1new[mask], y1new[mask], x2new[mask], y2new[mask])
-                if trans != None:
-                    if order == 0:
-                        (a11, b1, a22, b2) = trans
-                    elif order == 1:
-                        (a11, a12, b1, a21, a22, b2) = trans
-                    elif order == 2:
-                        (a1, b11, b12, c1, d11, d12, a2, b21, b22, c2, d21, d22) = trans
-                    elif order == 3:
-                        (a1, b11, b12, c1, d11, d12, e1, f1, g11, g12, a2, b21, b22, c2, d21, d22, e2, f2, g21, g22) = trans
-                else:
-                    break
-    
-                print "rms:", np.sqrt(np.sum((x1t[mask] - x2new[mask])**2 + (y1t[mask] - y2new[mask])**2) / len(x1t[mask]))
-
-                # transformed coordinates
-                if order == 0:
-                    x1t = b1 + a11 * x1new
-                    y1t = b2 + a22 * y1new
-                elif order == 1:
-                    x1t = b1 + a11 * x1new + a12 * y1new
-                    y1t = b2 + a21 * x1new + a22 * y1new
-                elif order == 2:
-                    x1t = a1 + b11 * x1new + b12 * y1new + c1 * x1new * y1new + d11 * x1new * x1new + d12 * y1new * y1new
-                    y1t = a2 + b21 * x1new + b22 * y1new + c2 * x1new * y1new + d21 * x1new * x1new + d22 * y1new * y1new
-                elif order == 3:
-                    x1t = a1 + b11 * x1new + b12 * y1new + c1 * x1new * y1new + d11 * x1new * x1new + d12 * y1new * y1new + e1 * x1new * x1new * y1new + f1 * x1new * y1new * y1new + g11 * x1new**3 + g12 * y1new**3
-                    y1t = a2 + b21 * x1new + b22 * y1new + c2 * x1new * y1new + d21 * x1new * x1new + d22 * y1new * y1new + e2 * x1new * x1new * y1new + f2 * x1new * y1new * y1new + g12 * x1new**3 + g22 * y1new**3
-                    
-                # plot new solution
-                if doplot:
-                    ax.scatter(x1t[mask] - x2new[mask], y1t[mask] - y2new[mask], marker = 'o', c = 'g', s = 200, facecolors = 'none')
-                    figname = os.path.join(outdir,"xy_diff_SOAR_o%i.png" % order)
-                    plt.savefig(figname)
-    
-                # show all original points in new coordinate system
-                if doplot:
-                    fig, ax = plt.subplots()
-                    if order == 0:
-                        x1tref = b1 + a11 * xref
-                        y1tref = b2 + a22 * yref
-                    elif order == 1:
-                        x1tref = b1 + a11 * xref + a12 * yref
-                        y1tref = b2 + a21 * xref + a22 * yref
-                    elif order == 2:
-                        x1tref = a1 + b11 * xref + b12 * yref + c1 * xref * yref + d11 * xref * xref + d12 * yref * yref
-                        y1tref = a2 + b21 * xref + b22 * yref + c2 * xref * yref + d21 * xref * xref + d22 * yref * yref
-                    elif order == 3:
-                        x1tref = a1 + b11 * xref + b12 * yref + c1 * xref * yref + d11 * xref * xref + d12 * yref * yref + e1 * xref * xref * yref + f1 * xref * yref * yref + g11 * xref**3 + g12 * yref**3
-                        y1tref = a2 + b21 * xref + b22 * yref + c2 * xref * yref + d21 * xref * xref + d22 * yref * yref + e2 * xref * xref * yref + f2 * xref * yref * yref + g21 * xref**3 + g22 * yref**3
-                    ax.scatter(x1tref, y1tref, marker = '.', c = 'r', lw = 0)
-                    ax.scatter(x1t, y1t, marker = 'o', c = 'b', facecolors = 'none')
-                    print np.max(xref), np.max(yref)
-                    figname = os.path.join(outdir,"xy_transformed_SOAR_o%i.png" % order)
-                    plt.savefig(figname)
-    
-                # fix nans
-                datanew[np.invert(np.isfinite(datanew))] = 0
-                background[np.invert(np.isfinite(background))] = 0
-    
-                # project image
-                print "Projecting sky subtracted image..."
-                alanczos = 4
-                if order == 0:
-                    projfast.o0_lanczos(alanczos, ny1, nx1, ny2, nx2, a11, a22, b1, b2, datanew.transpose())
-                elif order == 1:
-                    projfast.o1_lanczos(alanczos, ny1, nx1, ny2, nx2, a11, a12, a21, a22, b1, b2, datanew.transpose())
-                elif order == 2:
-                    projfast.o2_lanczos(alanczos, ny1, nx1, ny2, nx2, a1, b11, b12, c1, d11, d12, a2, b21, b22, c2, d21, d22, datanew.transpose())
-                elif order == 3:
-                    projfast.o3_lanczos(alanczos, ny1, nx1, ny2, nx2, a1, b11, b12, c1, d11, d12, e1, f1, g11, g12, a2, b21, b22, c2, d21, d22, e2, f2, g21, g22, datanew.transpose())
-                datanewproj = np.array((projfast.imageout[0:ny1, 0:nx1]).transpose())
-                print np.max(datanewproj)
-
-                # project background
-                print "Projecting background..."
-                alanczos = 4
-                if order == 0:
-                    projfast.o0_lanczos(alanczos, ny1, nx1, ny2, nx2, a11, a22, b1, b2, background.transpose())
-                elif order == 1:
-                    projfast.o1_lanczos(alanczos, ny1, nx1, ny2, nx2, a11, a12, a21, a22, b1, b2, background.transpose())
-                elif order == 2:
-                    projfast.o2_lanczos(alanczos, ny1, nx1, ny2, nx2, a1, b11, b12, c1, d11, d12, a2, b21, b22, c2, d21, d22, background.transpose())
-                elif order == 3:
-                    projfast.o3_lanczos(alanczos, ny1, nx1, ny2, nx2, a1, b11, b12, c1, d11, d12, e1, f1, g11, g12, a2, b21, b22, c2, d21, d22, e2, f2, g21, g22, background.transpose())
-                backgroundproj = np.array((projfast.imageout[0:ny1, 0:nx1]).transpose())
-                print np.max(backgroundproj)
-
-                # update headerref
-                headerref.update('MJD-OBS', MJD)
-
-                # save projected background
-                proj = fits.PrimaryHDU(data = backgroundproj, header = headerref)
-                fitsout = "%s/%s_%s_%02i_%04i_background_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, ifile, order)
-                proj.writeto(fitsout, clobber = True)
-
-                # save total projection
-                print "Saving total projected image"
-                datanewproj = np.array(backgroundproj + datanewproj)
-                proj = fits.PrimaryHDU(data = datanewproj, header = headerref)
-                fitsout = "%s/%s_%s_%02i_%04i_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, ifile, order)
-                proj.writeto(fitsout, clobber = True)
-
-                # run crblaster on projected image + background image
-                if docrblaster:
-                    
-                    crblasterpath = 'crblasterpath/crblaster'
-                    
-                    inmosaic = "%s/%s_%s_%02i_%04i_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, ifile, order)
-                    outmosaic = "%s/%s_%s_%02i_%04i_DECam_crblaster_o%i.fits" % (outdir, supernova, filter, CCDSOAR, ifile, order)
-                    backgroundfile = "%s/%s_%s_%02i_%04i_background_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, ifile, order)
-                    
-                    if os.path.exists(outmosaic):
-                        os.system("rm -rf %s" % outmosaic)
+                    # Matching
+                    # ---------------------
                         
-                    command = "mpirun -np %s %s 1 1 %s %s %s" % (ncores, crblasterpath, ncores, inmosaic, outmosaic)
-                    print command
-                    os.system(command)
+                    print "Looking for rough match..."
                     
-                    # recover sky subtracted image
-                    datanewprojcrblaster = fits.open(outmosaic)[0].data
+                    # first guess
+                    ibest = coords[1] - ny2 / npix / 2. 
+                    jbest = coords[0] - nx2 / npix / 2.
+                    
+                    print "Refining solution to 25 pixels..."
+                    (ibest, jbest) = roughastro(xref[flagref <= 4], x[flag <= 4] / npix, yref[flagref <=4], y[flag <= 4] / npix, ibest - 300, ibest + 300, jbest - 300, jbest + 300, 25)
+                    
+                    print "Refining solution to 5 pixels..."
+                    (ibest, jbest) = roughastro(xref[flagref <= 4], x[flag <= 4] / npix, yref[flagref <=4], y[flag <= 4] / npix, ibest - 25, ibest + 25, jbest - 25, jbest + 25, 5)
+                    
+                    print "Refining solution to 2 pixels..."
+                    (ibest, jbest) = roughastro(xref[flagref <= 4], x[flag <= 4] / npix, yref[flagref <=4], y[flag <= 4] / npix, ibest - 5, ibest + 5, jbest - 5, jbest + 5, 2)
+                    
+                    if doplot:
+                        ax.scatter(x[flag <= 4] / npix + ibest, y[flag <= 4] / npix + jbest, marker = 'o', facecolors = 'none', color = 'r', s = 10, lw = 0.2)
+                        if pos == len(CCDSOAR)-1 :
+                            # save the figure with rough astrometric solutions for both SOAR CCDs, projected on DECam       
+                            figname = os.path.join(outdir,'imref.png')
+                            fig1.savefig(figname, dpi = 400, bbox_inches = 'tight')
+                                 
+                    # Linear transformation
+                    # ---------------------------
+                        
+                    # find intersection
+                    (x1new, y1new, x2new, y2new) = intersect(xref[flagref <= 4], x[flag <= 4], yref[flagref <= 4], y[flag <= 4], ibest, jbest, npix)
+                    
+                    if doplot:
+                        # plot intersection in DECam coordinates before projection
+                        fig, ax = plt.subplots()
+                        for ipt in range(len(x1new)):
+                            ax.plot([x1new[ipt], x2new[ipt] / npix + ibest], [y1new[ipt], y2new[ipt] / npix + jbest], 'r')
+                        figname = os.path.join(outdir,"xy_match_DECam_o%i_%s.png" %(order,ccd))
+                        fig.savefig(figname)
+                    
+                        # plot intersection in DECam coordinates before projection
+                        fig, ax = plt.subplots()
+                        ax.scatter(x1new - (x2new / npix + ibest), y1new - (y2new / npix + jbest), marker = '.') 
+                        figname = os.path.join(outdir,"xy_diff_DECam_o%i_%s.png" %(order,ccd))
+                        fig.savefig(figname)
+                                                    
+                    # solve linear transformation between two coordinate systems
+                    if order == 0:
+                        trans = findshifttransformation(x1new, y1new, x2new, y2new)
+                    if order == 1:
+                        trans = findlineartransformation(x1new, y1new, x2new, y2new)
+                    elif order == 2:
+                        trans = find2ndordertransformation(x1new, y1new, x2new, y2new)
+                    elif order == 3:
+                        trans = find3rdordertransformation(x1new, y1new, x2new, y2new)
+                    if trans != None:
+                        if order == 0:
+                            (a11, b1, a22, b2) = trans
+                            x1t = b1 + a11 * x1new
+                            y1t = b2 + a22 * y1new
+                        if order == 1:
+                            (a11, a12, b1, a21, a22, b2) = trans
+                            x1t = b1 + a11 * x1new + a12 * y1new
+                            y1t = b2 + a21 * x1new + a22 * y1new
+                        elif order == 2:
+                            (a1, b11, b12, c1, d11, d12, a2, b21, b22, c2, d21, d22) = trans
+                            x1t = a1 + b11 * x1new + b12 * y1new + c1 * x1new * y1new + d11 * x1new * x1new + d12 * y1new * y1new
+                            y1t = a2 + b21 * x1new + b22 * y1new + c2 * x1new * y1new + d21 * x1new * x1new + d22 * y1new * y1new
+                        elif order == 3:
+                            (a1, b11, b12, c1, d11, d12, e1, f1, g11, g12, a2, b21, b22, c2, d21, d22, e2, f2, g21, g22) = trans
+                            x1t = a1 + b11 * x1new + b12 * y1new + c1 * x1new * y1new + d11 * x1new * x1new + d12 * y1new * y1new + e1 * x1new * x1new * y1new + f1 * x1new * y1new * y1new + g11 * x1new**3 + g12 * y1new**3
+                            y1t = a2 + b21 * x1new + b22 * y1new + c2 * x1new * y1new + d21 * x1new * x1new + d22 * y1new * y1new + e2 * x1new * x1new * y1new + f2 * x1new * y1new * y1new + g21 * x1new**3 + g22 * y1new**3
+                    else:
+                        continue
+              
+                    # plot intersection in SOAR coordinates after projection
+                    if doplot:
+                        fig, ax = plt.subplots()
+                        for ipt in range(len(x1new)):
+                            ax.plot([x1t[ipt], x2new[ipt]], [y1t[ipt], y2new[ipt]], 'r')
+                        figname = os.path.join(outdir,"xy_match_SOAR_o%i_%s.png" %(order,ccd))
+                        plt.savefig(figname)
 
-                    # copy data excluding edges eaten out by crblaster
-                    sky = np.median(datanewprojcrblaster[datanewprojcrblaster != 0])
-                    print sky
-                    datanewproj[datanewprojcrblaster > sky / 2.] = datanewprojcrblaster[datanewprojcrblaster > sky / 2.]
+                    # remove outliers to refine solution
+                    diffx = x1t - x2new
+                    diffy = y1t - y2new
+                    mask = (diffx >= np.percentile(diffx, 5)) & (diffx <= np.percentile(diffx, 95)) & (diffy >= np.percentile(diffy, 5)) & (diffy <= np.percentile(diffy, 95))
+                    if order == 0 and np.sum(mask) < 2 or order == 1 and np.sum(mask) < 3 or order == 2 and np.sum(mask) < 6 or order == 3 and np.sum(mask) < 10:
+                        mask = (x1t == x1t)
+    
+                    # plot transformed DECam coordinates in SOAR coordinates
+                    if doplot:
+                        fig, ax = plt.subplots()
+                        ax.scatter(x1t - x2new, y1t - y2new, marker = '.', c = 'r')
+                        ax.scatter(x1t[mask] - x2new[mask], y1t[mask] - y2new[mask], marker = 'o', c = 'b')
+                    
+                    # solve new linear transformation between two coordinate systems
+                    if order == 0:
+                        trans = findshifttransformation(x1new[mask], y1new[mask], x2new[mask], y2new[mask])
+                    elif order == 1:
+                        trans = findlineartransformation(x1new[mask], y1new[mask], x2new[mask], y2new[mask])
+                    elif order == 2:
+                        trans = find2ndordertransformation(x1new[mask], y1new[mask], x2new[mask], y2new[mask])
+                    elif order == 3:
+                        trans = find3rdordertransformation(x1new[mask], y1new[mask], x2new[mask], y2new[mask])
+                    if trans != None:
+                        if order == 0:
+                            (a11, b1, a22, b2) = trans
+                            x1t = b1 + a11 * x1new
+                            y1t = b2 + a22 * y1new
+                        elif order == 1:
+                            (a11, a12, b1, a21, a22, b2) = trans
+                            x1t = b1 + a11 * x1new + a12 * y1new
+                            y1t = b2 + a21 * x1new + a22 * y1new
+                        elif order == 2:
+                            (a1, b11, b12, c1, d11, d12, a2, b21, b22, c2, d21, d22) = trans
+                            x1t = a1 + b11 * x1new + b12 * y1new + c1 * x1new * y1new + d11 * x1new * x1new + d12 * y1new * y1new
+                            y1t = a2 + b21 * x1new + b22 * y1new + c2 * x1new * y1new + d21 * x1new * x1new + d22 * y1new * y1new
+                        elif order == 3:
+                            (a1, b11, b12, c1, d11, d12, e1, f1, g11, g12, a2, b21, b22, c2, d21, d22, e2, f2, g21, g22) = trans
+                            x1t = a1 + b11 * x1new + b12 * y1new + c1 * x1new * y1new + d11 * x1new * x1new + d12 * y1new * y1new + e1 * x1new * x1new * y1new + f1 * x1new * y1new * y1new + g11 * x1new**3 + g12 * y1new**3
+                            y1t = a2 + b21 * x1new + b22 * y1new + c2 * x1new * y1new + d21 * x1new * x1new + d22 * y1new * y1new + e2 * x1new * x1new * y1new + f2 * x1new * y1new * y1new + g12 * x1new**3 + g22 * y1new**3
+                    else:
+                        break
+                    
+                    print "rms:", np.sqrt(np.sum((x1t[mask] - x2new[mask])**2 + (y1t[mask] - y2new[mask])**2) / len(x1t[mask]))
+                    
+                    # plot new solution
+                    if doplot:
+                        ax.scatter(x1t[mask] - x2new[mask], y1t[mask] - y2new[mask], marker = 'o', c = 'g', s = 200, facecolors = 'none')
+                        figname = os.path.join(outdir,"xy_diff_SOAR_o%i_%s.png" %(order,ccd))
+                        fig.savefig(figname)
+                    
+                    # show all original points in new coordinate system
+                    if doplot:
+                        fig, ax = plt.subplots()
+                        if order == 0:
+                            x1tref = b1 + a11 * xref
+                            y1tref = b2 + a22 * yref
+                        elif order == 1:
+                            x1tref = b1 + a11 * xref + a12 * yref
+                            y1tref = b2 + a21 * xref + a22 * yref
+                        elif order == 2:
+                            x1tref = a1 + b11 * xref + b12 * yref + c1 * xref * yref + d11 * xref * xref + d12 * yref * yref
+                            y1tref = a2 + b21 * xref + b22 * yref + c2 * xref * yref + d21 * xref * xref + d22 * yref * yref
+                        elif order == 3:
+                            x1tref = a1 + b11 * xref + b12 * yref + c1 * xref * yref + d11 * xref * xref + d12 * yref * yref + e1 * xref * xref * yref + f1 * xref * yref * yref + g11 * xref**3 + g12 * yref**3
+                            y1tref = a2 + b21 * xref + b22 * yref + c2 * xref * yref + d21 * xref * xref + d22 * yref * yref + e2 * xref * xref * yref + f2 * xref * yref * yref + g21 * xref**3 + g22 * yref**3
+                        ax.scatter(x1tref, y1tref, marker = '.', c = 'r', lw = 0)
+                        ax.scatter(x1t, y1t, marker = 'o', c = 'b', facecolors = 'none')
+                        print np.max(xref), np.max(yref)
+                        figname = os.path.join(outdir,"xy_transformed_SOAR_o%i_%s.png" %(order,ccd))
+                        fig.savefig(figname)
+                                        
+                    # fix nans
+                    datanew[np.invert(np.isfinite(datanew))] = 0
+                    background[np.invert(np.isfinite(background))] = 0
+                    
+                    # project image
+                    '''
+                    It's better to project sky-subtracted images in order to remove the artifacts
+                    '''
+                    print "Projecting sky subtracted image..."
+                    alanczos = 4
+                    if order == 0:
+                        projfast.o0_lanczos(alanczos, ny1, nx1, ny2, nx2, a11, a22, b1, b2, datanew.transpose())
+                    elif order == 1:
+                        projfast.o1_lanczos(alanczos, ny1, nx1, ny2, nx2, a11, a12, a21, a22, b1, b2, datanew.transpose())
+                    elif order == 2:
+                        projfast.o2_lanczos(alanczos, ny1, nx1, ny2, nx2, a1, b11, b12, c1, d11, d12, a2, b21, b22, c2, d21, d22, datanew.transpose())
+                    elif order == 3:
+                        projfast.o3_lanczos(alanczos, ny1, nx1, ny2, nx2, a1, b11, b12, c1, d11, d12, e1, f1, g11, g12, a2, b21, b22, c2, d21, d22, e2, f2, g21, g22, datanew.transpose())
+                    datanewproj = np.array((projfast.imageout[0:ny1, 0:nx1]).transpose())
+                    #print np.max(datanewproj)
+                    
+                    # project background
+                    print "Projecting background..."
+                    alanczos = 4
+                    if order == 0:
+                        projfast.o0_lanczos(alanczos, ny1, nx1, ny2, nx2, a11, a22, b1, b2, background.transpose())
+                    elif order == 1:
+                        projfast.o1_lanczos(alanczos, ny1, nx1, ny2, nx2, a11, a12, a21, a22, b1, b2, background.transpose())
+                    elif order == 2:
+                        projfast.o2_lanczos(alanczos, ny1, nx1, ny2, nx2, a1, b11, b12, c1, d11, d12, a2, b21, b22, c2, d21, d22, background.transpose())
+                    elif order == 3:
+                        projfast.o3_lanczos(alanczos, ny1, nx1, ny2, nx2, a1, b11, b12, c1, d11, d12, e1, f1, g11, g12, a2, b21, b22, c2, d21, d22, e2, f2, g21, g22, background.transpose())
+                    backgroundproj = np.array((projfast.imageout[0:ny1, 0:nx1]).transpose())
+                    #print np.max(backgroundproj)
 
-                    # save new total projection with crblaster
+                    # update headerref
+                    headerref.set('MJD-OBS', MJD)
+
+                    # save projected background
+                    proj = fits.PrimaryHDU(data = backgroundproj, header = headerref)
+                    fitsout = "%s/%s_%s_%s_%04i_background_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
+                    proj.writeto(fitsout, clobber = True)
+
+                    # save total projection
                     print "Saving total projected image"
+                    datanewproj = np.array(backgroundproj + datanewproj)
                     proj = fits.PrimaryHDU(data = datanewproj, header = headerref)
-                    proj.writeto(outmosaic, clobber = True)
+                    fitsout = "%s/%s_%s_%s_%04i_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
+                    proj.writeto(fitsout, clobber = True)
+                                       
+                    # run crblaster on projected image + background image
+                    '''
+                    Running crblaster on images with the sky added allows to keep track of the variance
+                    '''
+                    if docrblaster:
+						
+                        print '\nRemoving cosmic rays...'
+                        
+                        crblasterpath = 'crblasterpath/crblaster'
+                                            
+                        inmosaic = "%s/%s_%s_%s_%04i_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
+                        outmosaic = "%s/%s_%s_%s_%04i_DECam_crblaster_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
+                        backgroundfile = "%s/%s_%s_%s_%04i_background_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
+                        
+                        if os.path.exists(outmosaic):
+                            os.system("rm -rf %s" % outmosaic)
+                        
+                        command = "mpirun -np %s %s 1 1 %s %s %s" % (ncores, crblasterpath, ncores, inmosaic, outmosaic)
+                        print command
+                        os.system(command)
+                    
+                        # recover sky subtracted image
+                        datanewprojcrblaster = fits.open(outmosaic)[0].data
+                        
+                        # copy data excluding edges eaten out by crblaster
+                        sky = np.median(datanewprojcrblaster[datanewprojcrblaster != 0])
+                        print sky
+                        datanewproj[datanewprojcrblaster > sky / 2.] = datanewprojcrblaster[datanewprojcrblaster > sky / 2.]
+                        
+                        # save new total projection with crblaster
+                        print "Saving total projected image (cosmic rays removed)"
+                        proj = fits.PrimaryHDU(data = datanewproj, header = headerref)
+                        proj.writeto(outmosaic, clobber = True)
 
-                    # subtract sky
-                    datanewproj = np.array(datanewproj - backgroundproj)
-
-                # add to master mosaic
-                final += datanewproj
-                finalbg += backgroundproj
-                nmosaic[datanewproj != 0] += 1
-
+                        # subtract sky
+                        '''
+                        We remove again the sky before stacking the images together (You don't want to stack the sky!!!)
+                        '''
+                        datanewproj = np.array(datanewproj - backgroundproj)
+                    
+                    # add to master mosaic
+                    final += datanewproj
+                    finalbg += backgroundproj
+                    nmosaic[datanewproj != 0] += 1
+                   
     # effective MJD
     MJD = np.average(np.array(iMJDs))
-    headerref.update("MJD-OBS", "%s" % MJD)
+    headerref.set("MJD-OBS", "%s" % MJD)
+    
+    print '\nSaving stacked images...'
     
     # save final projected image
     final[nmosaic != 0] = final[nmosaic != 0] / nmosaic[nmosaic != 0]
     final = float32(final)
     proj = fits.PrimaryHDU(data = final, header = headerref)
-    fitsout = "%s/%s_%s_%02i_nosky_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, order)
+    fitsout = "%s/%s_%s_final_nosky_DECam_o%i.fits" % (outdir, supernova, filter, order)
     proj.writeto(fitsout, clobber = True)
 
     # save final projected background
     finalbg[nmosaic != 0] = finalbg[nmosaic != 0] / nmosaic[nmosaic != 0]
     finalbg = float32(finalbg)
     proj = fits.PrimaryHDU(data = finalbg, header = headerref)
-    fitsout = "%s/%s_%s_%02i_background_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, order)
+    fitsout = "%s/%s_%s_final_background_DECam_o%i.fits" % (outdir, supernova, filter, order)
     proj.writeto(fitsout, clobber = True)
 
     # save number of images in the mosaic
-    fitsout = "%s/%s_%s_%02i_nmosaic_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, order)
+    fitsout = "%s/%s_%s_final_nmosaic_DECam_o%i.fits" % (outdir, supernova, filter, order)
     proj = fits.PrimaryHDU(data = nmosaic, header = headerref)
     proj.writeto(fitsout, clobber = True)
 
