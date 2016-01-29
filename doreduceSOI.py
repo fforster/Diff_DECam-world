@@ -1041,7 +1041,7 @@ rs2Dstars = np.array(np.sqrt((Xstars - (npsf + nf - 1.) / 2.)**2 + (Ystars - (np
 if doconvolve:
 	
     print "\nSTARTING CONVOLVE...\n"
-
+    
     # run sextractor on original image to remove background
     out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
     if out_sys==0 :
@@ -1050,19 +1050,20 @@ if doconvolve:
 		command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
     print command
     os.system(command)
+    
     datareforig = np.array(dataref)
     dataref = fits.open(fitsref.replace(".fits", "_nosky.fits"))[0].data
     headerref = fits.open(fitsref.replace(".fits", "_nosky.fits"))[0].header
-
+    
     # reference image variance map (must add wtmap)
     decamgain = np.sqrt(headerref['ARAWGAIN'])
     decamreadnoise = 7.
     varref = datareforig / decamgain 
     noise = fits.PrimaryHDU(data = np.sqrt(varref), header = headerref)
     noise.writeto(fitsref.replace(".fits", "_noise.fits"), clobber = True)
-
-    # run sextractor on final mosaic image
-    filename = "%s/%s_%s_%02i_nosky_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, order)
+    
+    # open final mosaic image
+    filename = "%s/%s_%s_final_nosky_DECam_o%i.fits" % (outdir, supernova, filter, order)
     headernew = fits.open(filename)[0].header
     datanew = fits.open(filename)[0].data
     backgroundnew = fits.open(filename.replace("nosky", "background"))[0].data
@@ -1075,7 +1076,7 @@ if doconvolve:
     varnew[nmosaic > 0] = (soarreadnoise**2 + (datanew[nmosaic > 0] + backgroundnew[nmosaic > 0]) / soargain) / npix / nmosaic[nmosaic > 0]
     noise = fits.PrimaryHDU(data = np.sqrt(varnew), header = headernew)
     noise.writeto(filename.replace(".fits", "_noise.fits"), clobber = True)
-
+    
     # run sextractor on projected image
     out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
     if out_sys==0 :
@@ -1091,9 +1092,9 @@ if doconvolve:
     except:
         print "Sextractor failed"
         sys.exit()
-    
+     
     # load mosaic image to mask training stars
-    filenmosaic = "%s/%s_%s_%02i_nmosaic_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, order)
+    filenmosaic = "%s/%s_%s_final_nmosaic_DECam_o%i.fits" % (outdir, supernova, filter, order)
     nmosaic = np.array(fits.open(filenmosaic)[0].data, dtype = int)
 
     # create x and y array to use nmosaic mask
@@ -1102,7 +1103,7 @@ if doconvolve:
     xidx[:] = np.arange(ny1)
     xidx = xidx.transpose()
     yidx[:] = np.arange(nx1)
-
+    
     # plot reference image with stars with nmosaic < 5 masked out
     mask = (flagref <= 4)
     nref = np.empty_like(xref, dtype = int)
@@ -1113,7 +1114,7 @@ if doconvolve:
         ax.imshow(dataref, interpolation = 'nearest', cmap = 'gray', clim = (np.percentile(dataref, 1), np.percentile(dataref, 99)), origin = 'lower')
         ax.scatter(x[flag <= 4], y[flag <= 4], marker = 'o', c = 'b', facecolors = 'none', lw = 0.2, s = 20)
         ax.scatter(xref[mask], yref[mask], marker = 'o', c = 'r', s = 5, facecolors = 'none', lw = 0.1)
-
+    
     # initialize kernel
     psf1s = None
     psf2s = None
@@ -1123,7 +1124,7 @@ if doconvolve:
     e_f2sel = []
     r1sel = []
     r2sel = []
-
+    
     # update mask
     for isource in range(len(xref)):
         nref[isource] = nmosaic[int(yref[isource]) - 1, int(xref[isource]) - 1]
@@ -1135,11 +1136,11 @@ if doconvolve:
     if doplot:
         ax.scatter(xref[mask], yref[mask], marker = 'o', c = 'b', s = 5, facecolors = 'none', lw = 0.5)
         figname = os.path.join(outdir,"test_xrefyref_o%i.png" % order)
-        plt.savefig(figname, dpi = 300)
-
+        fig.savefig(figname, dpi = 300)
+    
     # select stars to train kernel
     for isource in range(len(xref)):
-
+    
         # skip masked stars
         if not mask[isource] or pixmax1[isource] > 20000 or pixmax2[isource] > 20000:
             continue
@@ -1148,7 +1149,7 @@ if doconvolve:
         distall = np.sqrt((xref[isource] - xref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2 + (yref[isource] - yref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2)
         if np.min(distall) < 50:
             continue
-
+    
         # remove stars close to the SN position
         print "Star and supernova position:", xref[isource], yref[isource], coords[1], coords[0]
         distSN = np.sqrt((xref[isource] - coords[1])**2 + (yref[isource] - coords[0])**2)
@@ -1190,55 +1191,72 @@ if doconvolve:
         
         # print summary
         print isource, fluxref[isource], e_fluxref[isource], pixmax1[isource], pixmax2[isource], fluxref[isource], flux[bestmatch], rref[isource], r[bestmatch]
-
+        
         # plot stars
         fig, ax = plt.subplots(2, 1)
         ax[0].imshow(psf1, interpolation = 'nearest', clim = (np.percentile(psf1, 1), np.percentile(psf1, 99)), origin = 'lower')
         ax[1].imshow(psf2, interpolation = 'nearest', clim = (np.percentile(psf2, 1), np.percentile(psf2, 99)), origin = 'lower')
-        plt.savefig(filename.replace(".fits", "_kernelstar_%05i_o%i.png" % (isource, order)))
-
+        fig.savefig(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
+        
         print "    Adding star..."
-
+        
         # save psfs
         if psf1s == None:
             psf1s = psf1
-            psf2s = psf1
+            psf2s = psf2
         else:
             psf1s = np.dstack([psf1s, psf1])
             psf2s = np.dstack([psf2s, psf2])
-
+        
     # count selected stars
-    print psf1s
+    #print psf1s
     nstars = np.shape(psf1s)[2]
     print "Number of selected stars: %i" % nstars
-
+    
+    ### empirical psf ###
+    
     # select only stars for empirical psf
     r1sel = np.array(r1sel)
     r2sel = np.array(r2sel)
     f1sel = np.array(f1sel)
     f2sel = np.array(f2sel)
-    ravg = (r1sel + r2sel) / 2.
-    maskrs = (ravg < np.percentile(ravg, 75)) & (f1sel > 0) & (f2sel > 0)
+    #ravg = (r1sel + r2sel) / 2.
+    #maskrs = (ravg < np.percentile(ravg, 75)) & (f1sel > 0) & (f2sel > 0)
+    # new criterium
+    r1mad = np.median (np.absolute(r1sel - np.median(r1sel)))
+    r2mad = np.median (np.absolute(r2sel - np.median(r2sel)))
+    maskrs = (r1sel > np.median(r1sel) - r1mad) & (r1sel < np.median(r1sel) + r1mad) & (r2sel > np.median(r2sel) - r2mad) & (r2sel < np.median(r2sel) + r2mad) & (f1sel > 0) & (f2sel > 0)
+    if np.sum(maskrs) == 0 :
+		sys.exit()
+        
+    # plot the radii of stars in DECam vs. radii of stars in SOI
+    if (doplot) :
+        fig, ax = plt.subplots(1, 1)
+        ax.scatter(r1sel[maskrs], r2sel[maskrs], marker = 'o', c = 'b', s = 5, lw = 0.5)
+        ax.set_title ('Radii of selected stars for the kernel')
+        ax.set_xlabel ('DECam')
+        ax.set_ylabel ('SOI')
+        figname = os.path.join(outdir,"test_r1selr2sel_o%i.png" % order)
+        fig.savefig(figname, dpi = 300)
         
     # decide which image to convolve
     if np.median(r1sel[maskrs]) <= np.median(r2sel[maskrs]):
-        conv1st = True
+	    conv1st = True
     else:
         conv1st = False
-    conv1st = True
-    print "conv1st:", conv1st
-
+    print np.median(r1sel[maskrs]), np.median(r2sel[maskrs]), "--> conv1st:", conv1st
+        
     # infere empirical psf
     if conv1st:
         psfs = np.array(psf2s)
     else:
         psfs = np.array(psf1s)
-    for i in range(nstars):
-        if maskrs[i]:
-            psfs[:, :, i] = psfs[:, :, i] / np.abs(np.sum(psfs[:, :, i]))
-    psf = np.average(psfs[:, :, maskrs], axis = 2)
-    psf[rs2Dstars > 5] = 0
-    psf = psf / np.sum(psf)
+    #for i in range(nstars):
+    #    if maskrs[i]:
+    #        psfs[:, :, i] = psfs[:, :, i] / np.abs(np.sum(psfs[:, :, i]))
+    psf = np.sum(psfs[:, :, maskrs], axis = 2)    # filtering with maskrs
+    psf[rs2Dstars > 10] = 0    # removing outside pixels
+    psf = psf / np.sum(psf)    # psf normalization
 
     # plot psf
     if doplot:
@@ -1246,8 +1264,8 @@ if doconvolve:
         im = ax.imshow(psf, interpolation = 'nearest', origin = 'lower')
         fig.colorbar(im)
         figname = os.path.join(outdir,"psf_o%i.png" % order)
-        plt.savefig(figname)
-
+        fig.savefig(figname)
+    
     # start building kernel
     X = np.zeros((nstars * npsf2, nvar))
     Y = np.zeros(nstars * npsf2)
@@ -1296,9 +1314,10 @@ if doconvolve:
     # plot filter
     if doplot:
         fig, ax = plt.subplots()
-        ax.imshow(solfilter, interpolation = 'nearest', origin = 'lower')
+        im = ax.imshow(solfilter, interpolation = 'nearest', origin = 'lower')
+        fig.colorbar(im)
         figname = os.path.join(outdir,"solfilter_o%i.png" % order)
-        plt.savefig(figname)
+        fig.savefig(figname)
 
     # Compute normalization factor
     fig, ax = plt.subplots()
@@ -1312,7 +1331,7 @@ if doconvolve:
 #    solfilter = solfilter / normcomp * normfilter
     ax.set_xlabel("DECAM [ADU]")
     ax.set_ylabel("SOAR [ADU]")
-    plt.savefig(filename.replace(".fits", "_fluxcalib_o%i.png" % order))
+    fig.savefig(filename.replace(".fits", "_fluxcalib.png"))
 
     # prepare to apply kernel
     npartx = 1
@@ -1341,7 +1360,7 @@ if doconvolve:
     datat = np.empty_like(datanew)
 
     # recover and save solution
-    print "Saving solution"
+    print "Saving solution..."
     datat[i1: i2, j1: j2] = conv2fast.iout[0: dxconv, 0: dyconv]
     conv = fits.PrimaryHDU(data = float32(datat), header = headerref)
     conv.writeto(filename.replace(".fits", "_conv.fits"), clobber = True)
@@ -1378,7 +1397,7 @@ if dophotometry:
     print "\nSTARTING PHOTOMETRY...\n"
      
     # filename
-    filename = "%s/%s_%s_%02i_nosky_DECam_o%i.fits" % (outdir, supernova, filter, CCDSOAR, order)
+    filename = "%s/%s_%s_final_nosky_DECam_o%i.fits" % (outdir, supernova, filter, order)
     MJD = float(fits.open(filename)[0].header['MJD-OBS'])
 
     # open metadata
@@ -1387,22 +1406,22 @@ if dophotometry:
     solfilter = np.load(filename.replace(".fits", "_solfilter.npy"))
     normpsf = np.sum(psf)
     normfilter = np.sum(solfilter)
-    print conv1st, normfilter, normpsf
+    print 'conv1st =', conv1st, 'normfilter =', normfilter, 'normpsf =', normpsf
 
-    # plot psf and solfilter
-    if doplot:
-        fig, ax = plt.subplots()
-        im = ax.imshow(psf, interpolation = 'nearest', origin = 'lower')
-        fig.colorbar(im)
-        figname = os.path.join(outdir,"psf_o%i_phot.png" % order)
-        plt.savefig(figname)
+    ## plot psf and solfilter
+    #if doplot:
+    #    fig, ax = plt.subplots()
+    #    im = ax.imshow(psf, interpolation = 'nearest', origin = 'lower')
+    #    fig.colorbar(im)
+    #    figname = os.path.join(outdir,"psf_o%i.png" % order)
+    #    fig.savefig(figname)
+    #    
+    #    fig, ax = plt.subplots()
+    #    im = ax.imshow(solfilter, interpolation = 'nearest', origin = 'lower')
+    #    fig.colorbar(im)
+    #    figname = os.path.join(outdir,"solfilter_o%i.png" % order)
+    #    fig.savefig(figname)
         
-        fig, ax = plt.subplots()
-        im = ax.imshow(solfilter, interpolation = 'nearest', origin = 'lower')
-        fig.colorbar(im)
-        figname = os.path.join(outdir,"solfilter_o%i_phot.png" % order)
-        plt.savefig(figname)
-
     print rs2Dstars.flatten()[np.argmax(psf.flatten())]
 
     # open original image, convolved image and subtraction image
@@ -1417,12 +1436,15 @@ if dophotometry:
 
     # do better centering (maybe try doing some previous filtering?)
     (ix, iy) = coords
+    print "Before centering --> ix: %s, iy: %s" % (ix, iy)
     aux = ndimage.filters.gaussian_filter(diff[ix - 2: ix + 2, iy - 2: iy + 2], 4.)
     (dx, dy) = np.unravel_index(np.argmax(aux), np.shape(aux))
+    print 'After centering -->'
     print "dx: %s, dy: %s" % (dx, dy)
     ix = ix + (dx - 1) * 0.5
     iy = iy + (dy - 1) * 0.5
-    
+    print "ix: %s, iy: %s" % (ix, iy)
+        
     # mask for region to be included in the photometry
     maskphoto = (psf >= 0.2 * np.max(psf)) & (rs2Dstars < 4)
     imref = imref[ix - dn: ix + dn, iy - dn: iy + dn]
