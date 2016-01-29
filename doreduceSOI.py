@@ -348,19 +348,19 @@ if dodetrend:
                     if (iCCD == 1) or (iCCD == 3) :
 						
                         if (iCCD ==1) :    # combine AMP1 & AMP2 in CCDSOAR1
-                            newimage = np.vstack ((image2,image1))
+                            newimage = np.vstack ((image2,image1))    # In this way images look like correctly stacked
                             header.set('CCDNAME', 'CCD1')
                             header.set('EXTNM', 'im1+im2')
                             obs12 = fits.PrimaryHDU (data=float32(newimage), header=header)
-                            newname = filename.replace ('_02_', '_%s_' %CCDSOAR[0])
+                            newname = "%s/%s_%s_%s_%04i.fits" % (outdir, obj, filter, CCDSOAR[0], ifile)
                             print 'Saving combined images of AMP1 & AMP2 in\n--> %s' %newname
                             obs12.writeto (newname, clobber=True)
                         else :    # combine AMP3 & AMP4 in CCDSOAR2
-                            newimage = np.vstack ((image4,image3))
+                            newimage = np.vstack ((image4,image3))    # In this way images look like correctly stacked
                             header.set('CCDNAME', 'CCD2')
                             header.set('EXTNM', 'im3+im4')
                             obs34 = fits.PrimaryHDU (data=float32(newimage), header=header)
-                            newname = filename.replace ('_04_', '_%s_' %CCDSOAR[1])
+                            newname = "%s/%s_%s_%s_%04i.fits" % (outdir, obj, filter, CCDSOAR[1], ifile)
                             print 'Saving combined images of AMP3 & AMP4 in\n--> %s' %newname
                             obs34.writeto (newname, clobber=True)
                         
@@ -411,7 +411,7 @@ if dodetrend:
 
 else:
     
-    "Skipping Image detrend.."
+    print "\nSkipping Image detrend.."
 
 
 # PROJECTION
@@ -429,8 +429,8 @@ def findshifttransformation(x1, y1, x2, y2):
     # and (X^T X) beta = (X^T X')
 
     npt = len(x1)
-    if len(x1new) < 2:
-        print "\n\nWARNING: Not enough stars to shift astrometric solution (%i)...\n\n" % (len(x1new))
+    if len(x1) < 2:
+        print "\n\nWARNING: Not enough stars to shift astrometric solution (%i)...\n\n" % (len(x1))
         return None
     Y = np.zeros(2 * npt)
     Y[0:npt] = x2
@@ -464,8 +464,8 @@ def findlineartransformation(x1, y1, x2, y2):
     # and (X^T X) beta = (X^T X')
 
     npt = len(x1)
-    if len(x1new) < 3:
-        print "\n\nWARNING: Not enough stars to do linear astrometric solution (%i)...\n\n" % (len(x1new))
+    if len(x1) < 3:
+        print "\n\nWARNING: Not enough stars to do linear astrometric solution (%i)...\n\n" % (len(x1))
         return None
     Y = np.zeros(2 * npt)
     Y[0:npt] = x2
@@ -505,8 +505,8 @@ def find2ndordertransformation(x1, y1, x2, y2):
     # below we use the notation X'->Y
 
     npt = len(x1)
-    if len(x1new) < 6:
-        print "\n\nWARNING: Not enough stars to do quadratic astrometric solution (%i)...\n\n" % (len(x1new))
+    if len(x1) < 6:
+        print "\n\nWARNING: Not enough stars to do quadratic astrometric solution (%i)...\n\n" % (len(x1))
         return None
     Y = np.zeros(2 * npt)
     Y[0:npt] = x2
@@ -553,8 +553,8 @@ def find3rdordertransformation(x1, y1, x2, y2):
     # below we use the notation X'->Y
 
     npt = len(x1)
-    if len(x1new) < 10:
-        print "\n\nWARNING: Not enough stars to do cubic astrometric solution (%i)...\n\n" % (len(x1new))
+    if len(x1) < 10:
+        print "\n\nWARNING: Not enough stars to do cubic astrometric solution (%i)...\n\n" % (len(x1))
         return None
     Y = np.zeros(2 * npt)
     Y[0:npt] = x2
@@ -723,6 +723,7 @@ if domosaic:
                     
                     # open image to project
                     fitsnew = "%s/%s_%s_%s_%04i.fits" % (outdir, obj, filter, ccd, ifile)
+                    print 'Opening image %s' %fitsnew
                     background = fitsnew.replace(".fits", "_background-%03i.fits" % backsize)
                     headernew = fits.open(fitsnew)[0].header
                     background = fits.open(background)[0].data
@@ -731,6 +732,7 @@ if domosaic:
                     
                     # load sextractor sources
                     (x, y, flux, e_flux, r, flag) = np.loadtxt("%s/%s_%s_%s_%04i.fits-catalogue.dat" % (outdir, obj, filter, ccd, ifile), usecols = (1, 2, 5, 6, 8, 9)).transpose()
+                    print 'Loading SExtractor sources from\n--> %s/%s_%s_%s_%04i.fits-catalogue.dat' % (outdir, obj, filter, ccd, ifile)
                     
                     # Matching
                     # ---------------------
@@ -738,8 +740,11 @@ if domosaic:
                     print "Looking for rough match..."
                     
                     # first guess
-                    ibest = coords[1] - ny2 / npix / 2. 
-                    jbest = coords[0] - nx2 / npix / 2.
+                    ibest = coords[1] - ny2 / npix / 2.
+                    if pos == 0 :
+                        jbest = coords[0] - nx2 / npix / 2.     # first CCD
+                    else : 
+                        jbest = coords[0] - nx2 / npix * 3. / 2.    # second CCD   
                     
                     print "Refining solution to 25 pixels..."
                     (ibest, jbest) = roughastro(xref[flagref <= 4], x[flag <= 4] / npix, yref[flagref <=4], y[flag <= 4] / npix, ibest - 300, ibest + 300, jbest - 300, jbest + 300, 25)
@@ -968,7 +973,7 @@ if domosaic:
                         print "Saving total projected image (cosmic rays removed)"
                         proj = fits.PrimaryHDU(data = datanewproj, header = headerref)
                         proj.writeto(outmosaic, clobber = True)
-
+   
                         # subtract sky
                         '''
                         We remove again the sky before stacking the images together (You don't want to stack the sky!!!)
@@ -979,6 +984,7 @@ if domosaic:
                     final += datanewproj
                     finalbg += backgroundproj
                     nmosaic[datanewproj != 0] += 1
+                sys.exit()
                    
     # effective MJD
     MJD = np.average(np.array(iMJDs))
