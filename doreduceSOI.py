@@ -984,8 +984,7 @@ if domosaic:
                     final += datanewproj
                     finalbg += backgroundproj
                     nmosaic[datanewproj != 0] += 1
-                sys.exit()
-                   
+                                   
     # effective MJD
     MJD = np.average(np.array(iMJDs))
     headerref.set("MJD-OBS", "%s" % MJD)
