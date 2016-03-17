@@ -9,9 +9,11 @@ A main function ifSNdataexist does it by calling other two functions:
       reads DuPont and SOI fits file and write tables of some header elements into files saved in obsdate folders.
 
 Note: this code can be implemented by downloading data of not available SN, i.e. passing (field, CCD, epoch) to filldata.py  
-'''
 
-### IMPORTANT: SOLVE THE ISSUE WITH EPOCH. SOLVE THE ISSUE WITH UPPERCASE (ELISE)
+To run the code write on command line: python datacheck.py <instrument> <observation date>.
+e.g. 
+>>>python datacheck.py SOI 20140324
+'''
 
 import os
 import glob    # module to find pathnames
@@ -147,7 +149,7 @@ def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='S
     raSOI = np.array(raSOI)
     decSOI = np.array(decSOI)
     
-    # search matching coordinates around a separation of 1 arcsecond
+    # search matching coordinates around a separation of 1 arcsminute
     c = SkyCoord (ra=raSOI, dec=decSOI, unit=(u.hourangle, u.deg))
     catalog = SkyCoord (ra=raDECam, dec=decDECam, unit=(u.hourangle, u.deg))
     idxc, idxcatalog, d2d, d3d = catalog.search_around_sky(c, 1*u.arcmin)
@@ -156,11 +158,11 @@ def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='S
     date = dt.date.today().strftime('%m/%d/%Y')
     print ('\nUpdating fits file headers on %s...' %date)
     i = 0
-    for f in fitsfile[idxc] :    # loop only on the list of files that must be updated
+    for f in fitsfile[idxc] :    # loop only in the list of files that must be updated
         HDU = fits.open(f, mode='update')    # open the fits (they are already selected without IOError)
         priHDU = HDU[0].header
         newname = SN[idxcatalog[i]]
-        if priHDU['OBJECT'] != newname :
+        if priHDU['OBJECT'] != newname :    # update only if necessary
             print ('\nWriting %s into %s ...' %(newname, f))
             priHDU.set ('OBJ_OLD', priHDU['OBJECT'], 'object name given during the observation', after='OBJECT')
             priHDU.set ('OBJECT', newname, 'object name updated on %s' %date)

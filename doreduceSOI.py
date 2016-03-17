@@ -22,7 +22,11 @@ Things to do before running the code:
            - store permanently the environment variable by adding the line
              export NUMBER_OF_CORES=<ncores>
              to any current shell profile file as ~/.bashrc or ~/.profile 
-       The code assignes by default ncores=1 if no environment variable is defined      
+       The code assignes by default ncores=1 if no environment variable is defined   
+    4. run the code datacheck.py for the observation date with SOI of the SN you have to compute, by writing on command line: 
+           >>> python datacheck.py SOI <observation date>.
+           This will update the fits file OBJECT headers of the science images with the SNHiTS name format, for that observation date.
+           The headers are updated when matching the coordinates with those of SN HiTS catalougue within a circle of 1 arcmin radius.
 '''
 
 import os
