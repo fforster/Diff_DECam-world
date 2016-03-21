@@ -1,15 +1,14 @@
 #!/usr/bin/python2.7
 
 '''
-This code is made of one function that checks the availability of HiTS SN data on local disk.
-A main function ifSNdataexist does it by calling other two functions:
+A main function check_by_coordinates calls other two functions:
 - DECamSNlist
       reads the full list of HiTS SNe from 2014 and 2015 and make a dictionary where the key elements are SN nicknames
 - InstrSNlist 
       reads DuPont and SOI fits file and write tables of some header elements into files saved in obsdate folders.
-
-Note: this code can be implemented by downloading data of not available SN, i.e. passing (field, CCD, epoch) to filldata.py  
-
+The fuction check_by_coordinates search around the coordinates of HiTS SNe, in a circle of 1 arcmin radius,
+to match with the coordinates in the DuPont and SOI fits file headers.
+ 
 To run the code write on command line: python datacheck.py <instrument> <observation date>.
 e.g. 
 >>>python datacheck.py SOI 20140324
@@ -20,6 +19,7 @@ import glob    # module to find pathnames
 import sys
 import numpy as np 
 import datetime as dt    # class for manipulating date and time
+from shutil import copyfile
 from astropy.io import fits
 from astropy import units as u
 from astropy.coordinates import SkyCoord, match_coordinates_sky    # classes for matching catalogs by coordinates 
@@ -65,9 +65,9 @@ def InstrSNlist (instr, obsdate) :
     ### make paths to science images and output folder
     
     if instr == 'DuPont' :
-        instrdir = os.path.join ('DATA', instr)
+        instrdir = os.path.join ('rawDATA', instr)
     elif instr == 'SOI' :
-        instrdir = os.path.join ('DATA', 'SOAR', instr)
+        instrdir = os.path.join ('rawDATA', 'SOAR', instr)
     else :
         sys.exit('\ninstrument name is incorrect!')	
     
@@ -79,26 +79,24 @@ def InstrSNlist (instr, obsdate) :
     else :
         sys.exit('\nobservation date is incorrect!')
     
-    outdir = os.path.join (obsdir, 'OUT')
+    outdir = os.path.join ('procDATA', 'SOAR', 'SOI', obsdate)
     if not os.path.exists(outdir) :
     	os.makedirs(outdir)
     
-    ### make a table of fits for a given obsdate
+    ### make/read a table of fits for a given obsdate
 	
-    # length of pathnames
-    nchar1 = len(instrdir) + 1
-    nchar2 = len(obsdir) + 1
     # list the fits files in obsdir
     pathname = os.path.join(obsdir,'*.fits')
     files = sorted(glob.glob(pathname))
     # open the obsdate file and write the headline
-    outfile = os.path.join(outdir, '%s.dat' %obsdir[nchar1:])
-    print ('\nWriting into %s' %outfile)
-    with open(outfile,'wb') as outf:
-        if instr == 'DuPont' :
-            outf.write(b'# FILENAME OBJECT RA DEC FILTER AIRMASS EXPTIME\n')
-        else :
-            outf.write(b'# FILENAME OBJECT RA DEC FILTER1 FILTER2 AIRMASS EXPTIME\n')
+    outfile = os.path.join(outdir, '%s.dat' %obsdate)
+    if not os.path.exists(outfile) :
+        print ('\nWriting into %s' %outfile)
+        with open(outfile,'wb') as outf:
+            if instr == 'DuPont' :
+                outf.write(b'# FILENAME OBJECT RA DEC FILTER AIRMASS EXPTIME\n')
+            else :
+                outf.write(b'# FILENAME OBJECT RA DEC FILTER1 FILTER2 AIRMASS EXPTIME\n')
     
     # writing the obsdate file and returning lists of fits, ra and dec
     list_of_fits = []
@@ -114,13 +112,14 @@ def InstrSNlist (instr, obsdate) :
             continue    
         priHDU = HDU[0].header
         # write header values into file
-        with open (outfile,'a') as outf:
-            if instr == 'DuPont' :
-                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(f[nchar2:], priHDU['OBJECT'], 
-                priHDU['RA'], priHDU['DEC'], priHDU['FILTER'], priHDU['AIRMASS'], priHDU['EXPTIME']))
-            else :
-                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(f[nchar2:], priHDU['OBJECT'], 
-                priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))
+        if not os.path.exists(outfile) :
+            with open (outfile,'a') as outf:
+                if instr == 'DuPont' :
+                    outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(f.replace(obsdir,''), priHDU['OBJECT'], 
+                    priHDU['RA'], priHDU['DEC'], priHDU['FILTER'], priHDU['AIRMASS'], priHDU['EXPTIME']))
+                else :
+                    outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(f.replace(obsdir,''), priHDU['OBJECT'], 
+                    priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))
         # make a list of fits available for given instr and at given obsdate
         list_of_fits.append(f)
         ra.append(priHDU['RA'])
@@ -153,13 +152,21 @@ def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='S
     c = SkyCoord (ra=raSOI, dec=decSOI, unit=(u.hourangle, u.deg))
     catalog = SkyCoord (ra=raDECam, dec=decDECam, unit=(u.hourangle, u.deg))
     idxc, idxcatalog, d2d, d3d = catalog.search_around_sky(c, 1*u.arcmin)
-                
+    
     # updating OBJECT card in fits file headers with SNHiTS name
     date = dt.date.today().strftime('%m/%d/%Y')
     print ('\nUpdating fits file headers on %s...' %date)
     i = 0
     for f in fitsfile[idxc] :    # loop only in the list of files that must be updated
-        HDU = fits.open(f, mode='update')    # open the fits (they are already selected without IOError)
+		'''
+		copying the SOAR raw file into doreduce input directory,
+		where it can be processed.
+		'''
+		inf = f.replace ('rawDATA', 'procDATA')
+		print 'Copying %s\nin %s' %(f,inf)
+        copyfile (f, inf)
+		# open the fits (they are already selected without IOError)
+        HDU = fits.open(inf, mode='update')    
         priHDU = HDU[0].header
         newname = SN[idxcatalog[i]]
         if priHDU['OBJECT'] != newname :    # update only if necessary
@@ -168,7 +175,7 @@ def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='S
             priHDU.set ('OBJECT', newname, 'object name updated on %s' %date)
             #priHDU.add_history('header updated on %s' %date)
         else :
-            print ('\nSkipping %s ...' %f)
+            print ('\nSkipping %s ...' %inf)
         HDU.close()
         i += 1
 

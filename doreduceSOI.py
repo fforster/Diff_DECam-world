@@ -43,7 +43,7 @@ from pylab import *
 from astropy.time import Time # new date conversion
 from astropy.io import fits
 
-from datacheck import DECamSNlist    # to load SNHiTS dictionary
+from datacheck import DECamSNlist, check_by_coordinates    # to load SNHiTS dictionary and update the fits headers
 
 from projection import projfast
 from conv2fast import conv2fast
@@ -126,10 +126,6 @@ matplotlib.rc('ytick', labelsize = 7)
 # DECam pixel scale in SOAR pixel units
 npix = 0.265 / 0.155
 
-# open and plot reference image
-
-refdir = 'DATA/DATA_CMMPIPE'
-
 SNdict = DECamSNlist ()
 if supernova in SNdict :
     field = SNdict[supernova][2]
@@ -149,11 +145,22 @@ CCDSOAR = ['amps12', 'amps34']
 # filters
 filters = {'g': 's0011 g SDSS', 'r': 's0012 r SDSS'}
 
-# output directory
-indir = os.path.join('DATA','SOAR','SOI',obsdate)
+# reference image directory
+refdir = 'procDATA'
+
+# reference calibration data
+calibdir = 'calibDATA'
+
+# input & output directories
+indir = os.path.join('procDATA','SOAR','SOI',obsdate)
 outdir = os.path.join(indir,'OUT',supernova)
 if not os.path.exists(outdir):
     os.makedirs(outdir)
+    
+# run datacheck to prepare the input directory by copying SOAR data file and updating the headers)
+obsdatfile = os.path.join(indir, '%s.dat' %obsdate)
+if not os.path.exists(obsdatfile) :
+	check_by_coordinates ('SOI', obsdate)
 
 # download DECam data
 if download:
@@ -673,7 +680,8 @@ dataref = fits.open(fitsref)[0].data
 MJDref = headerref['MJD-OBS']
 
 # load reference catalogue
-(xref, yref, fluxref, e_fluxref, rref, flagref) = np.loadtxt("%s-catalogue_wtmap.dat" % (fitsref), usecols = (1, 2, 5, 6, 8, 9)).transpose()
+calibref = os.path.join (calibdir, field, CCD, '%s_%s_%s_image_crblaster.fits' %(field, CCD, epoch))
+(xref, yref, fluxref, e_fluxref, rref, flagref) = np.loadtxt("%s-catalogue_wtmap_backsize%s.dat" % (calibref,backsize), usecols = (1, 2, 5, 6, 8, 9)).transpose()
 
 # compute array sizes
 (nx1, ny1) = np.shape(dataref)
