@@ -90,13 +90,12 @@ def InstrSNlist (instr, obsdate) :
     files = sorted(glob.glob(pathname))
     # open the obsdate file and write the headline
     outfile = os.path.join(outdir, '%s.dat' %obsdate)
-    if not os.path.exists(outfile) :
-        print ('\nWriting into %s' %outfile)
-        with open(outfile,'wb') as outf:
-            if instr == 'DuPont' :
-                outf.write(b'# FILENAME OBJECT RA DEC FILTER AIRMASS EXPTIME\n')
-            else :
-                outf.write(b'# FILENAME OBJECT RA DEC FILTER1 FILTER2 AIRMASS EXPTIME\n')
+    print ('\nWriting into %s' %outfile)
+    with open(outfile,'wb') as outf:
+        if instr == 'DuPont' :
+            outf.write(b'# FILENAME OBJECT RA DEC FILTER AIRMASS EXPTIME\n')
+        else :
+            outf.write(b'# FILENAME OBJECT RA DEC FILTER1 FILTER2 AIRMASS EXPTIME\n')
     
     # writing the obsdate file and returning lists of fits, ra and dec
     list_of_fits = []
@@ -112,14 +111,13 @@ def InstrSNlist (instr, obsdate) :
             continue    
         priHDU = HDU[0].header
         # write header values into file
-        if not os.path.exists(outfile) :
-            with open (outfile,'a') as outf:
-                if instr == 'DuPont' :
-                    outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(f.replace(obsdir,''), priHDU['OBJECT'], 
-                    priHDU['RA'], priHDU['DEC'], priHDU['FILTER'], priHDU['AIRMASS'], priHDU['EXPTIME']))
-                else :
-                    outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(f.replace(obsdir,''), priHDU['OBJECT'], 
-                    priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))
+        with open (outfile,'a') as outf:
+            if instr == 'DuPont' :
+                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(f.replace(obsdir,''), priHDU['OBJECT'], 
+                priHDU['RA'], priHDU['DEC'], priHDU['FILTER'], priHDU['AIRMASS'], priHDU['EXPTIME']))
+            else :
+                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(f.replace(obsdir,''), priHDU['OBJECT'], 
+                priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))
         # make a list of fits available for given instr and at given obsdate
         list_of_fits.append(f)
         ra.append(priHDU['RA'])
