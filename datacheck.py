@@ -22,7 +22,7 @@ import datetime as dt    # class for manipulating date and time
 from shutil import copyfile
 from astropy.io import fits
 from astropy import units as u
-from astropy.coordinates import SkyCoord#, match_coordinates_sky    # classes for matching catalogs by coordinates 
+from astropy.coordinates import SkyCoord, match_coordinates_sky    # classes for matching catalogs by coordinates 
 
 
 def DECamSNlist (file2014='SNHiTS2014.dat', file2015='SNHiTS2015.dat') :
