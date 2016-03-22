@@ -161,14 +161,14 @@ def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='S
         where it can be processed.
         '''
         inf = f.replace ('rawDATA', 'procDATA')
-        print 'Copying %s\nin %s' %(f,inf)
+        print '\nCopying %s\nin %s' %(f,inf)
         copyfile (f, inf)
         # open the fits (they are already selected without IOError)
         HDU = fits.open(inf, mode='update')    
         priHDU = HDU[0].header
         newname = SN[idxcatalog[i]]
         if priHDU['OBJECT'] != newname :    # update only if necessary
-            print ('\nWriting %s into %s ...' %(newname, f))
+            print ('\nWriting OBJECT=%s into %s ...' %(newname, inf))
             priHDU.set ('OBJ_OLD', priHDU['OBJECT'], 'object name given during the observation', after='OBJECT')
             priHDU.set ('OBJECT', newname, 'object name updated on %s' %date)
             #priHDU.add_history('header updated on %s' %date)
