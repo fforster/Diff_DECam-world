@@ -994,8 +994,11 @@ if domosaic:
                         We remove again the sky before stacking the images together (You don't want to stack the sky!!!)
                         '''
                         datanewproj = np.array(datanewproj - backgroundproj)
+                        
+                        print 'datanewproj shape --> ', datanewproj.shape
                     
                     # add to master mosaic
+                    print 'final shape --> ', final.shape
                     final += datanewproj
                     finalbg += backgroundproj
                     nmosaic[datanewproj != 0] += 1
