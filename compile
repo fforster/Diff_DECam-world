@@ -1,2 +1,4 @@
-f2py -c -m projection --f90flags="-fopenmp -lm -ffree-form -ffree-line-length-none" --opt="-O3" -lgomp --fcompiler=gnu95 projection.f90
-f2py -c -m conv2fast --f90flags="-fopenmp -lm -ffree-form -ffree-line-length-none" --opt="-O3" -lgomp --fcompiler=gnu95 conv2fast.f90
+%f2py -c -m projection --f90flags="-fopenmp -lm -ffree-form -ffree-line-length-none" --opt="-O3" -lgomp --fcompiler=gnu95 projection.f90
+%f2py -c -m conv2fast --f90flags="-fopenmp -lm -ffree-form -ffree-line-length-none" --opt="-O3" -lgomp --fcompiler=gnu95 conv2fast.f90
+
+%for i in `ls f90/*`; do echo $i; target=`basename $i`; target=${target%%.*}; echo "Compiling $i -> $target"; f2py -c --fcompiler=intelem -m $target -L/opt/intel/mkl/lib/intel64 -L/opt/intel/lib/intel64 -liomp5 --f90flags="-fopenmp" --opt="-O2" $i; done
