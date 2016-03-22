@@ -152,6 +152,7 @@ refdir = 'procDATA'
 calibdir = 'calibDATA'
 
 # input & output directories
+rawdir = os.path.join('rawDATA','SOAR','SOI',obsdate)
 indir = os.path.join('procDATA','SOAR','SOI',obsdate)
 outdir = os.path.join(indir,'OUT',supernova)
 if not os.path.exists(outdir):
@@ -170,7 +171,8 @@ if download:
     print command
     os.system(command)
 
-# fits files
+# fits files lists
+rawfiles = os.listdir(rawdir)
 files = os.listdir(indir)
 
 # file calibration
@@ -187,9 +189,9 @@ if dodetrend:
 
     print "\nComputing master bias...\n"
 
-    for i in sorted(files):
+    for i in sorted(rawfiles):
     
-        filei = "%s/%s" % (indir, i)
+        filei = "%s/%s" % (rawdir, i)
         if re.match("zero.*?", i):
             print "Bias", i
             obs = fits.open(filei)
@@ -236,9 +238,9 @@ if dodetrend:
 
     print "\nComputing master flats...\n"
 
-    for i in sorted(files):
+    for i in sorted(rawfiles):
 
-        filei = "%s/%s" % (indir, i)
+        filei = "%s/%s" % (rawdir, i)
         if re.match("sflat.*?", i) or re.match("flat.*?", i):
             filteri1 = fits.open(filei)[0].header['FILTER1']
             filteri2 = fits.open(filei)[0].header['FILTER2']
