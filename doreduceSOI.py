@@ -1056,11 +1056,15 @@ if doconvolve:
     print "\nSTARTING CONVOLVE...\n"
     
     # run sextractor on original image to remove background
+    '''
+    This run computes a background-subtracted image (via setting the parameter -BACKGROUND),
+    therefore the useless generated catalogue is redirected to /dev/shm/.
+    '''
     out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
     if out_sys==0 :
-	    command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
+	    command = "sex %s -CATALOG_NAME /dev/shm/junk.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
     else :
-		command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
+		command = "sextractor %s -CATALOG_NAME /dev/shm/junk.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
     print command
     os.system(command)
     

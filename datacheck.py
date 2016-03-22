@@ -161,9 +161,9 @@ def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='S
 		'''
 		copying the SOAR raw file into doreduce input directory,
 		where it can be processed.
-		'''
-		inf = f.replace ('rawDATA', 'procDATA')
-		print 'Copying %s\nin %s' %(f,inf)
+        '''
+        inf = f.replace ('rawDATA', 'procDATA')
+        print 'Copying %s\nin %s' %(f,inf)
         copyfile (f, inf)
 		# open the fits (they are already selected without IOError)
         HDU = fits.open(inf, mode='update')    
