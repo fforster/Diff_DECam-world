@@ -158,14 +158,14 @@ def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='S
     print ('\nUpdating fits file headers on %s...' %date)
     i = 0
     for f in fitsfile[idxc] :    # loop only in the list of files that must be updated
-		'''
-		copying the SOAR raw file into doreduce input directory,
-		where it can be processed.
+        '''
+        copying the SOAR raw file into doreduce input directory,
+        where it can be processed.
         '''
         inf = f.replace ('rawDATA', 'procDATA')
         print 'Copying %s\nin %s' %(f,inf)
         copyfile (f, inf)
-		# open the fits (they are already selected without IOError)
+        # open the fits (they are already selected without IOError)
         HDU = fits.open(inf, mode='update')    
         priHDU = HDU[0].header
         newname = SN[idxcatalog[i]]
