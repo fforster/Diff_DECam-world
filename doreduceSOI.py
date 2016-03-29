@@ -146,7 +146,7 @@ CCDSOAR = ['amps12', 'amps34']
 filters = {'g': 's0011 g SDSS', 'r': 's0012 r SDSS'}
 
 # reference image directory
-refdir = 'procDATA'
+refdir = 'refDATA'
 
 # reference calibration data
 calibdir = 'calibDATA'
@@ -962,9 +962,8 @@ if domosaic:
 						
                         print '\nRemoving cosmic rays...'
                         
-                        #crblasterpath = 'crblasterpath/crblaster'
-                        crblasterpath = 'crblaster'
-                                            
+                        crblasterpath = 'crblasterpath/crblaster'
+                                                                    
                         inmosaic = "%s/%s_%s_%s_%04i_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
                         outmosaic = "%s/%s_%s_%s_%04i_DECam_crblaster_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
                         backgroundfile = "%s/%s_%s_%s_%04i_background_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
