@@ -146,14 +146,16 @@ CCDSOAR = ['amps12', 'amps34']
 filters = {'g': 's0011 g SDSS', 'r': 's0012 r SDSS'}
 
 # reference image directory
-refdir = 'refDATA'
+refdir = os.path.abspath('refDATA')
 
 # reference calibration data
-calibdir = 'calibDATA'
+calibdir = os.path.abspath('calibDATA')
 
 # input & output directories
 rawdir = os.path.join('rawDATA','SOAR','SOI',obsdate)
+rawdir = os.path.abspath(rawdir)
 indir = os.path.join('procDATA','SOAR','SOI',obsdate)
+indir = os.path.abspath(indir)
 outdir = os.path.join(indir,'OUT',supernova)
 if not os.path.exists(outdir):
     os.makedirs(outdir)
@@ -997,11 +999,8 @@ if domosaic:
                         We remove again the sky before stacking the images together (You don't want to stack the sky!!!)
                         '''
                         datanewproj = np.array(datanewproj - backgroundproj)
-                        
-                        print 'datanewproj shape --> ', datanewproj.shape
-                    
+                                                                   
                     # add to master mosaic
-                    print 'final shape --> ', final.shape
                     final += datanewproj
                     finalbg += backgroundproj
                     nmosaic[datanewproj != 0] += 1
