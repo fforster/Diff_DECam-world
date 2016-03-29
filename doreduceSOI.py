@@ -1080,7 +1080,10 @@ if doconvolve:
     headerref = fits.open(fitsref.replace(".fits", "_nosky.fits"))[0].header
     
     # reference image variance map (must add wtmap)
-    decamgain = np.sqrt(headerref['ARAWGAIN'])
+    if 'ARAWGAIN' in headerref :
+        decamgain = np.sqrt(headerref['ARAWGAIN'])
+    else :
+		decamgain = (headerref['GAINA'] +  headerref['GAINB']) / 2.
     decamreadnoise = 7.
     varref = datareforig / decamgain 
     noise = fits.PrimaryHDU(data = np.sqrt(varref), header = headerref)
