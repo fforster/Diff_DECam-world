@@ -962,7 +962,10 @@ if domosaic:
 						
                         print '\nRemoving cosmic rays...'
                         
-                        crblasterpath = 'crblasterpath/crblaster'
+                        if os.path.exists (crblasterpath) :
+                            crblasterpath = 'crblasterpath/crblaster'
+                        else :
+							crblasterpath = 'crblaster'
                                                                     
                         inmosaic = "%s/%s_%s_%s_%04i_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
                         outmosaic = "%s/%s_%s_%s_%04i_DECam_crblaster_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
