@@ -5,7 +5,7 @@ module projfast
   implicit none
   include "omp_lib.h"
   
-  real, dimension(4095, 4095) :: imageout
+  real, dimension(4100, 4100) :: imageout
   real, parameter :: pi = 3.14159265359
   real, parameter :: invpi = 0.31830988618
   
