@@ -962,6 +962,7 @@ if domosaic:
 						
                         print '\nRemoving cosmic rays...'
                         
+                        crblasterpath = 'crblasterpath'
                         if os.path.exists (crblasterpath) :
                             crblasterpath = 'crblasterpath/crblaster'
                         else :
