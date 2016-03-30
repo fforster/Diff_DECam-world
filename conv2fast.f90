@@ -5,7 +5,7 @@ module conv2fast
   implicit none
   include "omp_lib.h"
   
-  real, dimension(4100, 4100 :: iout
+  real, dimension(4100, 4100) :: iout
 
 contains
 
