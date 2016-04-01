@@ -1154,6 +1154,11 @@ if doconvolve:
     
     # update mask
     for isource in range(len(xref)):
+        print 'isource =', isource
+        print 'int(yref[isource]) =', int(yref[isource])
+        print 'int(xref[isource]) =', int(xref[isource])
+        print 'nmosaic.shape =', nmosaic.shape
+        print 'nref.shape =', nref.shape
         nref[isource] = nmosaic[int(yref[isource]) - 1, int(xref[isource]) - 1]
         pixmax1[isource] = dataref[int(yref[isource]) - 1, int(xref[isource]) - 1]
         pixmax2[isource] = datanew[int(yref[isource]) - 1, int(xref[isource]) - 1]
@@ -1580,4 +1585,4 @@ if dophotometry:
     print "Weighted flux (mag): %s (-%s +%s)" % (mag, e_mag_2, e_mag_1)
 
     # save results
-    np.savetxt(filename.replace(".fits", "_flux.dat"), [MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1])
+    np.savetxt(filename.replace(".fits", "_flux.dat"), [MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1], header='MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1')
