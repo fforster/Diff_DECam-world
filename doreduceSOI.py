@@ -1154,11 +1154,6 @@ if doconvolve:
     
     # update mask
     for isource in range(len(xref)):
-        print 'isource =', isource
-        print 'int(yref[isource]) =', int(yref[isource])
-        print 'int(xref[isource]) =', int(xref[isource])
-        print 'nmosaic.shape =', nmosaic.shape
-        print 'nref.shape =', nref.shape
         nref[isource] = nmosaic[int(yref[isource]) - 1, int(xref[isource]) - 1]
         pixmax1[isource] = dataref[int(yref[isource]) - 1, int(xref[isource]) - 1]
         pixmax2[isource] = datanew[int(yref[isource]) - 1, int(xref[isource]) - 1]
@@ -1265,6 +1260,8 @@ if doconvolve:
     if (doplot) :
         fig, ax = plt.subplots(1, 1)
         ax.scatter(r1sel[maskrs], r2sel[maskrs], marker = 'o', c = 'b', s = 5, lw = 0.5)
+        idline = np.linspace (min(np.amin(r1sel[maskrs]),np.amin(r2sel[maskrs])), max(np.amax(r1sel[maskrs]),np.amax(r2sel[maskrs])))
+        ax.plot (idline, idline, 'k--')
         ax.set_title ('Radii of selected stars for the kernel')
         ax.set_xlabel ('DECam')
         ax.set_ylabel ('SOI')
