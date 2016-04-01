@@ -1585,4 +1585,5 @@ if dophotometry:
     print "Weighted flux (mag): %s (-%s +%s)" % (mag, e_mag_2, e_mag_1)
 
     # save results
-    np.savetxt(filename.replace(".fits", "_flux.dat"), [MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1], header='MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1')
+    fluxout = np.array ([[MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1]])
+    np.savetxt(filename.replace(".fits", "_flux.dat"), fluxout, fmt='%.4e', header='MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1')
