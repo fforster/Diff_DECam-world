@@ -1109,7 +1109,7 @@ if doconvolve:
     decamreadnoise = 7.
     varref = datareforig / decamgain 
     if dowriteto :
-		noise = fits.PrimaryHDU(data = np.sqrt(varref), header = headerref)
+        noise = fits.PrimaryHDU(data = np.sqrt(varref), header = headerref)
         noise.writeto(fitsref.replace(".fits", "_noise.fits"), clobber = True)
     
     # open final mosaic image
