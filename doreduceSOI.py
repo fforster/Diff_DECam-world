@@ -13,7 +13,12 @@ Programs to install:
     - mpirun (the installation of the package including this utility depends on the operating system)
             
 Things to do before running the code:
-    1. create a symbolic link to your local path to DATA (where input and output data are stored) and name it "DATA"
+    1. create symbolic links to your local path where input and output data are stored, as follows:
+           > ln -s /path/to/SOI&DuPont/data rawDATA
+           > ln -s /path/to/SOI&DuPont/processed_data procDATA (*)
+           > ln -s /path/to/DECam/data refDATA
+           > ln -s /path/to/DECam/calibration_data calibDATA (*)
+           note: on your local machine, rawDATA and procDATA might have the same path. The same for refDATA and calibDATA. However, you must create all four paths.
     2. create a symbolic link to your local folder where crblast executable file is stored and name it "crblasterpath"
     3. set the environment variable NUMBER_OF_CORES=<ncores>, where <ncores> is the number of CPU cores of your computer.
        This can be done in two ways (bash shell):
@@ -113,7 +118,11 @@ print '\nnumber of cores = %s\n' %ncores
 # other options
 dotrim = True
 DECamize = True  # rotate image to have the same orientation of the DECam images
+
+# options to overwrite existing files (set False to avoid overwriting) 
 docrblaster = True
+dosextractor =True
+dowriteto = True
 doplot = True
 
 # background backfilter size
@@ -234,7 +243,8 @@ if dodetrend:
     
         exec("header%i = obs[iCCD + 1].header" % (iCCD + 1))
         exec("obs%i = fits.PrimaryHDU(data = float32(zero%i), header = header%i)" % (iCCD + 1, iCCD + 1, iCCD + 1))
-        exec("obs%i.writeto(\"%s/bias_master_%02i.fits\", clobber = True)" % (iCCD + 1, outdir, iCCD + 1))
+        if dowriteto :
+            exec("obs%i.writeto(\"%s/bias_master_%02i.fits\", clobber = True)" % (iCCD + 1, outdir, iCCD + 1))
     
     # compute flats
 
@@ -295,7 +305,8 @@ if dodetrend:
     
         exec("header%i = obs[iCCD + 1].header" % (iCCD + 1))
         exec("obs%i = fits.PrimaryHDU(data = float32(flat%i), header = header%i)" % (iCCD + 1, iCCD + 1, iCCD + 1))
-        exec("obs%i.writeto(\"%s/flat_master_%s_%02i.fits\", clobber = True)" % (iCCD + 1, outdir, filter, iCCD + 1))
+        if dowriteto :
+            exec("obs%i.writeto(\"%s/flat_master_%s_%02i.fits\", clobber = True)" % (iCCD + 1, outdir, filter, iCCD + 1))
     
     # correct images                    
 
@@ -354,8 +365,9 @@ if dodetrend:
                     header.set('CTYPE2', 'DEC--TAN')
                     exec("obs%i = fits.PrimaryHDU(data = float32(image%i), header = header)" % (iCCD + 1, iCCD + 1))
                     filename = "%s/%s_%s_%02i_%04i.fits" % (outdir, obj, filter, iCCD + 1, ifile)
-                    print "Saving file %s" % filename
-                    exec("obs%i.writeto(\"%s\", clobber = True)" % (iCCD + 1, filename))
+                    if dowriteto :
+                        print "Saving file %s" % filename
+                        exec("obs%i.writeto(\"%s\", clobber = True)" % (iCCD + 1, filename))
 
                     # before running sextractor, we need to combine two amplifiers together. 
                     # run sextractor for CCD1 and CCD2, i.e for obs1+obs2 and obs3+obs4.
@@ -368,26 +380,29 @@ if dodetrend:
                             header.set('EXTNM', 'im1+im2')
                             obs12 = fits.PrimaryHDU (data=float32(newimage), header=header)
                             newname = "%s/%s_%s_%s_%04i.fits" % (outdir, obj, filter, CCDSOAR[0], ifile)
-                            print 'Saving combined images of AMP1 & AMP2 in\n--> %s' %newname
-                            obs12.writeto (newname, clobber=True)
+                            if dowriteto :
+                                print 'Saving combined images of AMP1 & AMP2 in\n--> %s' %newname
+                                obs12.writeto (newname, clobber=True)
                         else :    # combine AMP3 & AMP4 in CCDSOAR2
                             newimage = np.vstack ((image4,image3))    # In this way images look like correctly stacked
                             header.set('CCDNAME', 'CCD2')
                             header.set('EXTNM', 'im3+im4')
                             obs34 = fits.PrimaryHDU (data=float32(newimage), header=header)
                             newname = "%s/%s_%s_%s_%04i.fits" % (outdir, obj, filter, CCDSOAR[1], ifile)
-                            print 'Saving combined images of AMP3 & AMP4 in\n--> %s' %newname
-                            obs34.writeto (newname, clobber=True)
+                            if dowriteto :
+                                print 'Saving combined images of AMP3 & AMP4 in\n--> %s' %newname
+                                obs34.writeto (newname, clobber=True)
                         
                         # run sextractor
                         background = newname.replace(".fits", "_background-%03i.fits" % backsize)
-                        out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
-                        if out_sys==0 :
-					    	command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (newname, newname, backsize, background)
-                        else :
-					    	command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (newname, newname, backsize, background)
-                        print command
-                        os.system(command)
+                        if dosextractor :
+                            out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
+                            if out_sys==0 :
+					        	command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (newname, newname, backsize, background)
+                            else :
+					        	command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -CHECKIMAGE_TYPE BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (newname, newname, backsize, background)
+                            print command
+                            os.system(command)
                         
                         # load catalogue
                         try:
@@ -945,16 +960,18 @@ if domosaic:
                     headerref.set('MJD-OBS', MJD)
 
                     # save projected background
-                    proj = fits.PrimaryHDU(data = backgroundproj, header = headerref)
-                    fitsout = "%s/%s_%s_%s_%04i_background_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
-                    proj.writeto(fitsout, clobber = True)
+                    if dowriteto :
+                        proj = fits.PrimaryHDU(data = backgroundproj, header = headerref)
+                        fitsout = "%s/%s_%s_%s_%04i_background_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
+                        proj.writeto(fitsout, clobber = True)
 
                     # save total projection
-                    print "Saving total projected image"
                     datanewproj = np.array(backgroundproj + datanewproj)
-                    proj = fits.PrimaryHDU(data = datanewproj, header = headerref)
-                    fitsout = "%s/%s_%s_%s_%04i_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
-                    proj.writeto(fitsout, clobber = True)
+                    if dowriteto :
+                        proj = fits.PrimaryHDU(data = datanewproj, header = headerref)
+                        fitsout = "%s/%s_%s_%s_%04i_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
+                        print "Saving total projected image"
+                        proj.writeto(fitsout, clobber = True)
                                        
                     # run crblaster on projected image + background image
                     '''
@@ -990,9 +1007,10 @@ if domosaic:
                         datanewproj[datanewprojcrblaster > sky / 2.] = datanewprojcrblaster[datanewprojcrblaster > sky / 2.]
                         
                         # save new total projection with crblaster
-                        print "Saving total projected image (cosmic rays removed)"
-                        proj = fits.PrimaryHDU(data = datanewproj, header = headerref)
-                        proj.writeto(outmosaic, clobber = True)
+                        if dowriteto :
+                            print "Saving total projected image (cosmic rays removed)"
+                            proj = fits.PrimaryHDU(data = datanewproj, header = headerref)
+                            proj.writeto(outmosaic, clobber = True)
    
                         # subtract sky
                         '''
@@ -1012,23 +1030,26 @@ if domosaic:
     print '\nSaving stacked images...'
     
     # save final projected image
-    final[nmosaic != 0] = final[nmosaic != 0] / nmosaic[nmosaic != 0]
-    final = float32(final)
-    proj = fits.PrimaryHDU(data = final, header = headerref)
-    fitsout = "%s/%s_%s_final_nosky_DECam_o%i.fits" % (outdir, supernova, filter, order)
-    proj.writeto(fitsout, clobber = True)
+    if dowriteto :
+        final[nmosaic != 0] = final[nmosaic != 0] / nmosaic[nmosaic != 0]
+        final = float32(final)
+        proj = fits.PrimaryHDU(data = final, header = headerref)
+        fitsout = "%s/%s_%s_final_nosky_DECam_o%i.fits" % (outdir, supernova, filter, order)
+        proj.writeto(fitsout, clobber = True)
 
     # save final projected background
-    finalbg[nmosaic != 0] = finalbg[nmosaic != 0] / nmosaic[nmosaic != 0]
-    finalbg = float32(finalbg)
-    proj = fits.PrimaryHDU(data = finalbg, header = headerref)
-    fitsout = "%s/%s_%s_final_background_DECam_o%i.fits" % (outdir, supernova, filter, order)
-    proj.writeto(fitsout, clobber = True)
+    if dowriteto :
+        finalbg[nmosaic != 0] = finalbg[nmosaic != 0] / nmosaic[nmosaic != 0]
+        finalbg = float32(finalbg)
+        proj = fits.PrimaryHDU(data = finalbg, header = headerref)
+        fitsout = "%s/%s_%s_final_background_DECam_o%i.fits" % (outdir, supernova, filter, order)
+        proj.writeto(fitsout, clobber = True)
 
     # save number of images in the mosaic
-    fitsout = "%s/%s_%s_final_nmosaic_DECam_o%i.fits" % (outdir, supernova, filter, order)
-    proj = fits.PrimaryHDU(data = nmosaic, header = headerref)
-    proj.writeto(fitsout, clobber = True)
+    if dowriteto :
+        fitsout = "%s/%s_%s_final_nmosaic_DECam_o%i.fits" % (outdir, supernova, filter, order)
+        proj = fits.PrimaryHDU(data = nmosaic, header = headerref)
+        proj.writeto(fitsout, clobber = True)
 
 # prepare for convolution
 # -----------------------------------------
@@ -1067,13 +1088,14 @@ if doconvolve:
     This run computes a background-subtracted image (via setting the parameter -BACKGROUND),
     therefore the useless generated catalogue is redirected to /dev/shm/.
     '''
-    out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
-    if out_sys==0 :
-	    command = "sex %s -CATALOG_NAME /dev/shm/junk.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
-    else :
-		command = "sextractor %s -CATALOG_NAME /dev/shm/junk.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
-    print command
-    os.system(command)
+    if dosextractor :
+        out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
+        if out_sys==0 :
+	        command = "sex %s -CATALOG_NAME /dev/shm/junk.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
+        else :
+	    	command = "sextractor %s -CATALOG_NAME /dev/shm/junk.dat -BACK_SIZE %i -CHECKIMAGE_TYPE -BACKGROUND -CHECKIMAGE_NAME %s -VERBOSE_TYPE QUIET" % (fitsref, backsize, fitsref.replace(".fits", "_nosky.fits"))
+        print command
+        os.system(command)
     
     datareforig = np.array(dataref)
     dataref = fits.open(fitsref.replace(".fits", "_nosky.fits"))[0].data
@@ -1086,8 +1108,9 @@ if doconvolve:
 		decamgain = (headerref['GAINA'] +  headerref['GAINB']) / 2.
     decamreadnoise = 7.
     varref = datareforig / decamgain 
-    noise = fits.PrimaryHDU(data = np.sqrt(varref), header = headerref)
-    noise.writeto(fitsref.replace(".fits", "_noise.fits"), clobber = True)
+    if dowriteto :
+		noise = fits.PrimaryHDU(data = np.sqrt(varref), header = headerref)
+        noise.writeto(fitsref.replace(".fits", "_noise.fits"), clobber = True)
     
     # open final mosaic image
     filename = "%s/%s_%s_final_nosky_DECam_o%i.fits" % (outdir, supernova, filter, order)
@@ -1101,17 +1124,19 @@ if doconvolve:
     soargain = 2.0
     varnew = np.empty_like(datanew)
     varnew[nmosaic > 0] = (soarreadnoise**2 + (datanew[nmosaic > 0] + backgroundnew[nmosaic > 0]) / soargain) / npix / nmosaic[nmosaic > 0]
-    noise = fits.PrimaryHDU(data = np.sqrt(varnew), header = headernew)
-    noise.writeto(filename.replace(".fits", "_noise.fits"), clobber = True)
+    if dowriteto :
+        noise = fits.PrimaryHDU(data = np.sqrt(varnew), header = headernew)
+        noise.writeto(filename.replace(".fits", "_noise.fits"), clobber = True)
     
     # run sextractor on projected image
-    out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
-    if out_sys==0 :
-	    command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -VERBOSE_TYPE QUIET" % (filename, filename, backsize)
-    else :
-		command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -VERBOSE_TYPE QUIET" % (filename, filename, backsize)
-    print command
-    os.system(command)
+    if dosextractor :
+        out_sys = os.system("which sex")    # check if sextractor is called with whether the command sex or sextractor
+        if out_sys==0 :
+	        command = "sex %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -VERBOSE_TYPE QUIET" % (filename, filename, backsize)
+        else :
+	    	command = "sextractor %s -CATALOG_NAME %s-catalogue.dat -BACK_SIZE %i -VERBOSE_TYPE QUIET" % (filename, filename, backsize)
+        print command
+        os.system(command)
     
     # load catalogue
     try:
@@ -1389,18 +1414,20 @@ if doconvolve:
     datat = np.empty_like(datanew)
 
     # recover and save solution
-    print "Saving solution..."
     datat[i1: i2, j1: j2] = conv2fast.iout[0: dxconv, 0: dyconv]
-    conv = fits.PrimaryHDU(data = float32(datat), header = headerref)
-    conv.writeto(filename.replace(".fits", "_conv.fits"), clobber = True)
+    if dowriteto :
+        print "Saving solution..."
+        conv = fits.PrimaryHDU(data = float32(datat), header = headerref)
+        conv.writeto(filename.replace(".fits", "_conv.fits"), clobber = True)
 
     # difference
     if conv1st:
         diff = datanew - datat
     else:
         diff = datat - dataref
-    difffits = fits.PrimaryHDU(data = float32(diff), header = headerref)
-    difffits.writeto(filename.replace(".fits", "_diff.fits"), clobber = True)
+    if dowriteto :    
+        difffits = fits.PrimaryHDU(data = float32(diff), header = headerref)
+        difffits.writeto(filename.replace(".fits", "_diff.fits"), clobber = True)
     
     # variance of the difference
     if conv1st:
@@ -1409,12 +1436,14 @@ if doconvolve:
         vardiff = varref + varnew * normfilter**2
     
     # variance
-    varfits = fits.PrimaryHDU(data = float32(vardiff), header = headerref)
-    varfits.writeto(filename.replace(".fits", "_vardiff.fits"), clobber = True)
+    if dowriteto :
+        varfits = fits.PrimaryHDU(data = float32(vardiff), header = headerref)
+        varfits.writeto(filename.replace(".fits", "_vardiff.fits"), clobber = True)
 
     # snr
-    snrfits = fits.PrimaryHDU(data = float32(diff / np.sqrt(vardiff)), header = headerref)
-    snrfits.writeto(filename.replace(".fits", "_snrdiff.fits"), clobber = True)
+    if dowriteto :
+        snrfits = fits.PrimaryHDU(data = float32(diff / np.sqrt(vardiff)), header = headerref)
+        snrfits.writeto(filename.replace(".fits", "_snrdiff.fits"), clobber = True)
 
     # save psf and conv1st
     np.save(filename.replace(".fits", "_conv1st.npy"), conv1st)
