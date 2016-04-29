@@ -120,8 +120,8 @@ dotrim = True
 DECamize = True  # rotate image to have the same orientation of the DECam images
 
 # options to overwrite existing files (set False to avoid overwriting) 
-docrblaster = True
-dosextractor =True
+docrblaster = False
+dosextractor = False
 dowriteto = True
 doplot = True
 
@@ -977,6 +977,11 @@ if domosaic:
                     '''
                     Running crblaster on images with the sky added allows to keep track of the variance
                     '''
+                    
+                    inmosaic = "%s/%s_%s_%s_%04i_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
+                    outmosaic = "%s/%s_%s_%s_%04i_DECam_crblaster_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
+                    backgroundfile = "%s/%s_%s_%s_%04i_background_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
+                    
                     if docrblaster:
 						
                         print '\nRemoving cosmic rays...'
@@ -987,10 +992,6 @@ if domosaic:
                         else :
 							crblasterpath = 'crblaster'
                                                                     
-                        inmosaic = "%s/%s_%s_%s_%04i_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
-                        outmosaic = "%s/%s_%s_%s_%04i_DECam_crblaster_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
-                        backgroundfile = "%s/%s_%s_%s_%04i_background_DECam_o%i.fits" % (outdir, supernova, filter, ccd, ifile, order)
-                        
                         if os.path.exists(outmosaic):
                             os.system("rm -rf %s" % outmosaic)
                         
@@ -998,25 +999,25 @@ if domosaic:
                         print command
                         os.system(command)
                     
-                        # recover sky subtracted image
-                        datanewprojcrblaster = fits.open(outmosaic)[0].data
-                        
-                        # copy data excluding edges eaten out by crblaster
-                        sky = np.median(datanewprojcrblaster[datanewprojcrblaster != 0])
-                        print sky
-                        datanewproj[datanewprojcrblaster > sky / 2.] = datanewprojcrblaster[datanewprojcrblaster > sky / 2.]
-                        
-                        # save new total projection with crblaster
-                        if dowriteto :
-                            print "Saving total projected image (cosmic rays removed)"
-                            proj = fits.PrimaryHDU(data = datanewproj, header = headerref)
-                            proj.writeto(outmosaic, clobber = True)
+                    # recover sky subtracted image
+                    datanewprojcrblaster = fits.open(outmosaic)[0].data
+                    
+                    # copy data excluding edges eaten out by crblaster
+                    sky = np.median(datanewprojcrblaster[datanewprojcrblaster != 0])
+                    print sky
+                    datanewproj[datanewprojcrblaster > sky / 2.] = datanewprojcrblaster[datanewprojcrblaster > sky / 2.]
+                    
+                    # save new total projection with crblaster
+                    if dowriteto :
+                        print "Saving total projected image (cosmic rays removed)"
+                        proj = fits.PrimaryHDU(data = datanewproj, header = headerref)
+                        proj.writeto(outmosaic, clobber = True)
    
-                        # subtract sky
-                        '''
-                        We remove again the sky before stacking the images together (You don't want to stack the sky!!!)
-                        '''
-                        datanewproj = np.array(datanewproj - backgroundproj)
+                    # subtract sky
+                    '''
+                    We remove again the sky before stacking the images together (You don't want to stack the sky!!!)
+                    '''
+                    datanewproj = np.array(datanewproj - backgroundproj)
                                                                    
                     # add to master mosaic
                     final += datanewproj
@@ -1292,6 +1293,23 @@ if doconvolve:
         ax.set_ylabel ('SOI')
         figname = os.path.join(outdir,"test_r1selr2sel_o%i.png" % order)
         fig.savefig(figname, dpi = 300)
+        
+    # plot fluxes of stars in DECam vs. fluxes of stars in SOI
+    if (doplot) :
+        fig, ax = plt.subplots(1, 1)
+        ax = plt.gca()
+        ax.scatter(f1sel[maskrs], f2sel[maskrs], marker = 'o', c = 'b', s = 10, lw = 0.5, label='used for the empirical psf')
+        ax.scatter(f1sel[-maskrs], f2sel[-maskrs], marker = 'o', c = 'r', s = 10, lw = 0.5, label='not used for the empirical psf')
+        ax.set_yscale('log')
+        ax.set_xscale('log')
+        idline = np.linspace (min(np.amin(f1sel),np.amin(f2sel)), max(np.amax(f1sel),np.amax(f2sel)))
+        ax.plot (idline, idline, 'k--')
+        ax.set_title ('Fluxes of selected stars for the kernel')
+        ax.set_xlabel ('DECam')
+        ax.set_ylabel ('SOI')
+        plt.legend(loc=2, scatterpoints=1, frameon=False)
+        figname = os.path.join(outdir,"test_f1self2sel_o%i.png" % order)
+        fig.savefig(figname, dpi = 300)    
         
     # decide which image to convolve
     if np.median(r1sel[maskrs]) <= np.median(r2sel[maskrs]):
