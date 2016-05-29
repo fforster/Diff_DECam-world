@@ -122,7 +122,7 @@ DECamize = True  # rotate image to have the same orientation of the DECam images
 # options to overwrite existing files (set False to avoid overwriting) 
 docrblaster = False
 dosextractor = False
-dowriteto = True
+dowriteto = False
 doplot = True
 
 # background backfilter size
@@ -1150,12 +1150,12 @@ if doconvolve:
     filenmosaic = "%s/%s_%s_final_nmosaic_DECam_o%i.fits" % (outdir, supernova, filter, order)
     nmosaic = np.array(fits.open(filenmosaic)[0].data, dtype = int)
 
-    # create x and y array to use nmosaic mask
-    xidx = np.zeros((nx1, ny1), dtype = 'int32')
-    yidx = np.zeros((ny1, nx1), dtype = 'int32')
-    xidx[:] = np.arange(ny1)
-    xidx = xidx.transpose()
-    yidx[:] = np.arange(nx1)
+    ## create x and y array to use nmosaic mask
+    #xidx = np.zeros((nx1, ny1), dtype = 'int32')
+    #yidx = np.zeros((ny1, nx1), dtype = 'int32')
+    #xidx[:] = np.arange(ny1)
+    #xidx = xidx.transpose()
+    #yidx[:] = np.arange(nx1)
     
     # plot reference image with stars with nmosaic < 5 masked out
     mask = (flagref <= 4)
@@ -1165,8 +1165,21 @@ if doconvolve:
     if doplot:
         fig, ax = plt.subplots()
         ax.imshow(dataref, interpolation = 'nearest', cmap = 'gray', clim = (np.percentile(dataref, 1), np.percentile(dataref, 99)), origin = 'lower')
-        ax.scatter(x[flag <= 4], y[flag <= 4], marker = 'o', c = 'b', facecolors = 'none', lw = 0.2, s = 20)
-        ax.scatter(xref[mask], yref[mask], marker = 'o', c = 'r', s = 5, facecolors = 'none', lw = 0.1)
+        ax.scatter(x[flag <= 4], y[flag <= 4], marker = 'o', s = 20, facecolors = 'none', lw = 0.2)
+        ax.scatter(xref[mask], yref[mask], marker = 'o', edgecolors = 'r', s = 5, facecolors = 'none', lw = 0.1)
+    
+    # update mask
+    for isource in range(len(xref)):
+        nref[isource] = nmosaic[int(yref[isource]) - 1, int(xref[isource]) - 1]
+        pixmax1[isource] = dataref[int(yref[isource]) - 1, int(xref[isource]) - 1]
+        pixmax2[isource] = datanew[int(yref[isource]) - 1, int(xref[isource]) - 1]
+    mask = np.array(mask & (nref >= np.max(nmosaic) / 2.))
+    #maskfinal = np.zeros(np.shape(mask), dtype = bool)
+
+    if doplot:
+        ax.scatter(xref[mask], yref[mask], marker = 'o', s = 5, facecolors = 'none', lw = 0.5)
+        figname = os.path.join(outdir,"test_xrefyref_o%i.png" % order)
+        fig.savefig(figname, dpi = 300)
     
     # initialize kernel
     psf1s = None
@@ -1177,19 +1190,6 @@ if doconvolve:
     e_f2sel = []
     r1sel = []
     r2sel = []
-    
-    # update mask
-    for isource in range(len(xref)):
-        nref[isource] = nmosaic[int(yref[isource]) - 1, int(xref[isource]) - 1]
-        pixmax1[isource] = dataref[int(yref[isource]) - 1, int(xref[isource]) - 1]
-        pixmax2[isource] = datanew[int(yref[isource]) - 1, int(xref[isource]) - 1]
-    mask = np.array(mask & (nref >= np.max(nmosaic) / 2.))
-    maskfinal = np.zeros(np.shape(mask), dtype = bool)
-
-    if doplot:
-        ax.scatter(xref[mask], yref[mask], marker = 'o', c = 'b', s = 5, facecolors = 'none', lw = 0.5)
-        figname = os.path.join(outdir,"test_xrefyref_o%i.png" % order)
-        fig.savefig(figname, dpi = 300)
     
     # select stars to train kernel
     for isource in range(len(xref)):
@@ -1498,7 +1498,7 @@ if dophotometry:
     #    figname = os.path.join(outdir,"solfilter_o%i.png" % order)
     #    fig.savefig(figname)
         
-    print rs2Dstars.flatten()[np.argmax(psf.flatten())]
+    print rs2Dstars.flatten()[np.argmax(psf.flatten())]    # ???
 
     # open original image, convolved image and subtraction image
     imref = fits.open(fitsref)[0].data
