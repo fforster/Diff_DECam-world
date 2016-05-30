@@ -1198,9 +1198,10 @@ if doconvolve:
         if not mask[isource] or pixmax1[isource] > 20000 or pixmax2[isource] > 20000:
             continue
 
-        # remove non isolated stars
+        # remove non-isolated stars
         distall = np.sqrt((xref[isource] - xref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2 + (yref[isource] - yref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2)
         if np.min(distall) < 50:
+            print "Non-isolated star"
             continue
     
         # remove stars close to the SN position
@@ -1234,14 +1235,6 @@ if doconvolve:
             print "No matching star"
             continue
 
-        # save fluxes
-        f1sel.append(fluxref[isource])
-        e_f1sel.append(e_fluxref[isource])
-        f2sel.append(flux[bestmatch])
-        e_f2sel.append(e_flux[bestmatch])
-        r1sel.append(rref[isource])
-        r2sel.append(r[bestmatch])
-        
         # print summary
         print isource, fluxref[isource], e_fluxref[isource], pixmax1[isource], pixmax2[isource], fluxref[isource], flux[bestmatch], rref[isource], r[bestmatch]
         
@@ -1252,6 +1245,14 @@ if doconvolve:
         fig.savefig(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
         
         print "    Adding star..."
+        
+        # save fluxes
+        f1sel.append(fluxref[isource])
+        e_f1sel.append(e_fluxref[isource])
+        f2sel.append(flux[bestmatch])
+        e_f2sel.append(e_flux[bestmatch])
+        r1sel.append(rref[isource])
+        r2sel.append(r[bestmatch])
         
         # save psfs
         if psf1s == None:
@@ -1279,7 +1280,12 @@ if doconvolve:
     r1mad = np.median (np.absolute(r1sel - np.median(r1sel)))
     r2mad = np.median (np.absolute(r2sel - np.median(r2sel)))
     maskrs = (r1sel > np.median(r1sel) - r1mad) & (r1sel < np.median(r1sel) + r1mad) & (r2sel > np.median(r2sel) - r2mad) & (r2sel < np.median(r2sel) + r2mad) & (f1sel > 0) & (f2sel > 0)
-    if np.sum(maskrs) == 0 :
+        
+    # count finally selected stars
+    fnstars = np.sum(maskrs)
+    print "Number of unmasked selected stars: %i" % fnstars
+    
+    if fnstars == 0 :
 		sys.exit()
         
     # plot the radii of stars in DECam vs. radii of stars in SOI
