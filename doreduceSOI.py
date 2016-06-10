@@ -120,9 +120,9 @@ dotrim = True
 DECamize = True  # rotate image to have the same orientation of the DECam images
 
 # options to overwrite existing files (set False to avoid overwriting) 
-docrblaster = False
-dosextractor = False
-dowriteto = False
+docrblaster = True
+dosextractor = True
+dowriteto = True
 doplot = True
 
 # background backfilter size
@@ -1200,8 +1200,10 @@ if doconvolve:
 
         # remove non-isolated stars
         distall = np.sqrt((xref[isource] - xref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2 + (yref[isource] - yref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2)
+        #for dist in range(50) :
+        #if np.min(distall) < dist+1:
         if np.min(distall) < 50:
-            print "Non-isolated star"
+            #print "Non-isolated star found"
             continue
     
         # remove stars close to the SN position
@@ -1316,6 +1318,8 @@ if doconvolve:
         plt.legend(loc=2, scatterpoints=1, frameon=False)
         figname = os.path.join(outdir,"test_f1self2sel_o%i.png" % order)
         fig.savefig(figname, dpi = 300)    
+    
+    sys.exit('\n***STOP***\n')
         
     # decide which image to convolve
     if np.median(r1sel[maskrs]) <= np.median(r2sel[maskrs]):
