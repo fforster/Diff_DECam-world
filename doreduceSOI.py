@@ -1181,144 +1181,177 @@ if doconvolve:
         figname = os.path.join(outdir,"test_xrefyref_o%i.png" % order)
         fig.savefig(figname, dpi = 300)
     
-    # initialize kernel
-    psf1s = None
-    psf2s = None
-    f1sel = []
-    e_f1sel = []
-    f2sel = []
-    e_f2sel = []
-    r1sel = []
-    r2sel = []
+    # loop within distances for selecting isolated stars 
+    dmax = arange(50)+1
+    fluxratio = []
     
-    # select stars to train kernel
-    for isource in range(len(xref)):
+    for idmax in dmax :
+		
+        print "\nSelected distance for isolated stars: %i\n" %(idmax)
+		
+        # initialize kernel
+        psf1s = None
+        psf2s = None
+        f1sel = []
+        e_f1sel = []
+        f2sel = []
+        e_f2sel = []
+        r1sel = []
+        r2sel = []
     
-        # skip masked stars
-        if not mask[isource] or pixmax1[isource] > 20000 or pixmax2[isource] > 20000:
-            continue
-
-        # remove non-isolated stars
-        distall = np.sqrt((xref[isource] - xref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2 + (yref[isource] - yref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2)
-        #for dist in range(50) :
-        #if np.min(distall) < dist+1:
-        if np.min(distall) < 50:
-            #print "Non-isolated star found"
-            continue
+        # select stars to train kernel
+        for isource in range(len(xref)):
+        
+            # skip masked stars
+            if not mask[isource] or pixmax1[isource] > 20000 or pixmax2[isource] > 20000:
+                continue
+            
+            # remove non-isolated stars
+            distall = np.sqrt((xref[isource] - xref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2 + (yref[isource] - yref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2)
+            if np.min(distall) < idmax:
+                print "Non-isolated star found"
+                continue
+            
+            # remove stars close to the SN position
+            print "Star and supernova position:", xref[isource], yref[isource], coords[1], coords[0]
+            distSN = np.sqrt((xref[isource] - coords[1])**2 + (yref[isource] - coords[0])**2)
+            if distSN < 50:
+                print "Star too close to the supernova"
+                continue
+            
+            # take stamps and check size
+            psf1 = dataref[int(yref[isource]) - dn: int(yref[isource]) + dn, int(xref[isource]) - dn: int(xref[isource]) + dn]
+            psf2 = datanew[int(yref[isource]) - dn: int(yref[isource]) + dn, int(xref[isource]) - dn: int(xref[isource]) + dn]
+            if np.shape(psf1) != (2 * dn, 2 * dn) or np.shape(psf2) != (2 * dn, 2 * dn):
+                print "Star stamp is not squared"
+                continue
+            
+            # remove stars near the edges of the image
+            if np.median(psf1) == 0 or np.median(psf2) == 0:
+                print "It appears that the image is close to the edge of one of the cameras"
+                continue
+            
+            # remove bright stars on the edges of the stamp or close to the supernova position
+            if rs2Dstars.flatten()[np.argmax(psf1.flatten())] >= 5 or rs2Dstars.flatten()[np.argmax(psf2.flatten())] >= 5:
+                print "Star has other bright stars in the field"
+                continue
+            
+            # find best match in new image
+            distcat = np.sqrt((xref[isource] - x)**2 + (yref[isource] - y)**2)
+            bestmatch = np.argmin(distcat)
+            if distcat[bestmatch] > 4:
+                print "No matching star"
+                continue
+            
+            # print summary
+            print isource, fluxref[isource], e_fluxref[isource], pixmax1[isource], pixmax2[isource], fluxref[isource], flux[bestmatch], rref[isource], r[bestmatch]
+            
+            # plot stars
+            #fig, ax = plt.subplots(2, 1)
+            #ax[0].imshow(psf1, interpolation = 'nearest', clim = (np.percentile(psf1, 1), np.percentile(psf1, 99)), origin = 'lower')
+            #ax[1].imshow(psf2, interpolation = 'nearest', clim = (np.percentile(psf2, 1), np.percentile(psf2, 99)), origin = 'lower')
+            #fig.savefig(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
+            
+            print "    Adding star..."
+            
+            # save fluxes
+            f1sel.append(fluxref[isource])
+            e_f1sel.append(e_fluxref[isource])
+            f2sel.append(flux[bestmatch])
+            e_f2sel.append(e_flux[bestmatch])
+            r1sel.append(rref[isource])
+            r2sel.append(r[bestmatch])
+            
+            # save psfs
+            if psf1s == None:
+                psf1s = psf1
+                psf2s = psf2
+            else:
+                psf1s = np.dstack([psf1s, psf1])
+                psf2s = np.dstack([psf2s, psf2])
+        
+        # count selected stars
+        #print psf1s
+        nstars = np.shape(psf1s)[2]
+        print "Number of selected stars: %i" % nstars
+        
+        ### empirical psf ###
+        
+        # select only stars for empirical psf
+        r1sel = np.array(r1sel)
+        r2sel = np.array(r2sel)
+        f1sel = np.array(f1sel)
+        f2sel = np.array(f2sel)
+        #ravg = (r1sel + r2sel) / 2.
+        #maskrs = (ravg < np.percentile(ravg, 75)) & (f1sel > 0) & (f2sel > 0)
+        # new criterium
+        r1mad = np.median (np.absolute(r1sel - np.median(r1sel)))
+        r2mad = np.median (np.absolute(r2sel - np.median(r2sel)))
+        maskrs = (r1sel > np.median(r1sel) - r1mad) & (r1sel < np.median(r1sel) + r1mad) & (r2sel > np.median(r2sel) - r2mad) & (r2sel < np.median(r2sel) + r2mad) & (f1sel > 0) & (f2sel > 0)
+            
+        # count finally selected stars
+        fnstars = np.sum(maskrs)
+        print "Number of unmasked selected stars: %i" % fnstars
+        
+        if fnstars == 0 :
+	    	sys.exit()
+            
+        # plot the radii of stars in DECam vs. radii of stars in SOI
+        if (doplot) :
+            if idmax % 5 == 0 :
+                fig, ax = plt.subplots(1, 1)
+                ax.scatter(r1sel[maskrs], r2sel[maskrs], marker = 'o', c = 'b', s = 5, lw = 0.5)
+                idline = np.linspace (min(np.amin(r1sel[maskrs]),np.amin(r2sel[maskrs])), max(np.amax(r1sel[maskrs]),np.amax(r2sel[maskrs])))
+                ax.plot (idline, idline, 'k--')
+                ax.set_title ('Radii of selected stars for the kernel')
+                ax.set_xlabel (r'$r_{\rm DECam}\,[\rm{ADU}]$')
+                ax.set_ylabel (r'$r_{\rm SOI}\,[\rm{ADU}]$')
+                figname = os.path.join(outdir,"test_r1selr2sel_o%i_D%i.png" %(order,idmax))
+                fig.savefig(figname, dpi = 300)
+        
+        # linear fit of f_SOI vs. f_DECam
+        logf1sel = np.log10(f1sel[maskrs])
+        logf2sel = np.log10(f2sel[maskrs])
+        coeffs = np.polyfit(logf1sel,logf2sel,deg=1)
+        poly = np.poly1d(coeffs)
+        f2fit = poly(logf1sel)
+        print poly[1],poly[0] 
+            
+        # plot fluxes of stars in DECam vs. fluxes of stars in SOI
+        if (doplot) :
+            if idmax % 5 == 0 :
+                fig, ax = plt.subplots(1, 1)
+                #ax = plt.gca()
+                ax.scatter(logf1sel, logf2sel, marker = 'o', c = 'b', s = 10, lw = 0.5, label='used for the empirical psf (%i)' %fnstars)
+                ax.scatter(np.log10(f1sel[-maskrs]), np.log10(f2sel[-maskrs]), marker = 'o', c = 'r', s = 10, lw = 0.5, label='not used for the empirical psf (%i)' %(nstars-fnstars))
+                #ax.set_yscale('log')
+                #ax.set_xscale('log')
+                #idline = np.linspace (min(np.amin(f1sel),np.amin(f2sel)), max(np.amax(f1sel),np.amax(f2sel)))
+                #ax.plot (idline, idline, 'k--')
+                ax.plot (logf1sel, f2fit, 'b--')
+                ax.text (0.80, 0.20, '%.2f+%.2f'%(poly[1],poly[0]), transform=ax.transAxes, color='b', fontsize=14)
+                ax.set_title ('Fluxes of selected stars for the kernel')
+                ax.set_xlabel (r'$\log (f_{\rm DECam})\,[\rm{ADU}]$')
+                ax.set_ylabel (r'$\log (f_{\rm SOI})\,[\rm{ADU}]$')
+                plt.legend(loc=2, scatterpoints=1, frameon=False)
+                figname = os.path.join(outdir,"test_f1self2sel_o%i_D%i.png" %(order,idmax))
+                fig.savefig(figname, dpi = 300)    
     
-        # remove stars close to the SN position
-        print "Star and supernova position:", xref[isource], yref[isource], coords[1], coords[0]
-        distSN = np.sqrt((xref[isource] - coords[1])**2 + (yref[isource] - coords[0])**2)
-        if distSN < 50:
-            print "Star too close to the supernova"
-            continue
-        
-        # take stamps and check size
-        psf1 = dataref[int(yref[isource]) - dn: int(yref[isource]) + dn, int(xref[isource]) - dn: int(xref[isource]) + dn]
-        psf2 = datanew[int(yref[isource]) - dn: int(yref[isource]) + dn, int(xref[isource]) - dn: int(xref[isource]) + dn]
-        if np.shape(psf1) != (2 * dn, 2 * dn) or np.shape(psf2) != (2 * dn, 2 * dn):
-            print "Star stamp is not squared"
-            continue
-
-        # remove stars near the edges of the image
-        if np.median(psf1) == 0 or np.median(psf2) == 0:
-            print "It appears that the image is close to the edge of one of the cameras"
-            continue
-
-        # remove bright stars on the edges of the stamp or close to the supernova position
-        if rs2Dstars.flatten()[np.argmax(psf1.flatten())] >= 5 or rs2Dstars.flatten()[np.argmax(psf2.flatten())] >= 5:
-            print "Star has other bright stars in the field"
-            continue
-
-        # find best match in new image
-        distcat = np.sqrt((xref[isource] - x)**2 + (yref[isource] - y)**2)
-        bestmatch = np.argmin(distcat)
-        if distcat[bestmatch] > 4:
-            print "No matching star"
-            continue
-
-        # print summary
-        print isource, fluxref[isource], e_fluxref[isource], pixmax1[isource], pixmax2[isource], fluxref[isource], flux[bestmatch], rref[isource], r[bestmatch]
-        
-        # plot stars
-        fig, ax = plt.subplots(2, 1)
-        ax[0].imshow(psf1, interpolation = 'nearest', clim = (np.percentile(psf1, 1), np.percentile(psf1, 99)), origin = 'lower')
-        ax[1].imshow(psf2, interpolation = 'nearest', clim = (np.percentile(psf2, 1), np.percentile(psf2, 99)), origin = 'lower')
-        fig.savefig(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
-        
-        print "    Adding star..."
-        
-        # save fluxes
-        f1sel.append(fluxref[isource])
-        e_f1sel.append(e_fluxref[isource])
-        f2sel.append(flux[bestmatch])
-        e_f2sel.append(e_flux[bestmatch])
-        r1sel.append(rref[isource])
-        r2sel.append(r[bestmatch])
-        
-        # save psfs
-        if psf1s == None:
-            psf1s = psf1
-            psf2s = psf2
-        else:
-            psf1s = np.dstack([psf1s, psf1])
-            psf2s = np.dstack([psf2s, psf2])
-        
-    # count selected stars
-    #print psf1s
-    nstars = np.shape(psf1s)[2]
-    print "Number of selected stars: %i" % nstars
+        fluxratio.append(poly[0])
     
-    ### empirical psf ###
+    # transform flux ratio in linear scale
+    fluxratio = np.array(fluxratio)
+    fluxratio = 10**fluxratio 
     
-    # select only stars for empirical psf
-    r1sel = np.array(r1sel)
-    r2sel = np.array(r2sel)
-    f1sel = np.array(f1sel)
-    f2sel = np.array(f2sel)
-    #ravg = (r1sel + r2sel) / 2.
-    #maskrs = (ravg < np.percentile(ravg, 75)) & (f1sel > 0) & (f2sel > 0)
-    # new criterium
-    r1mad = np.median (np.absolute(r1sel - np.median(r1sel)))
-    r2mad = np.median (np.absolute(r2sel - np.median(r2sel)))
-    maskrs = (r1sel > np.median(r1sel) - r1mad) & (r1sel < np.median(r1sel) + r1mad) & (r2sel > np.median(r2sel) - r2mad) & (r2sel < np.median(r2sel) + r2mad) & (f1sel > 0) & (f2sel > 0)
-        
-    # count finally selected stars
-    fnstars = np.sum(maskrs)
-    print "Number of unmasked selected stars: %i" % fnstars
-    
-    if fnstars == 0 :
-		sys.exit()
-        
-    # plot the radii of stars in DECam vs. radii of stars in SOI
     if (doplot) :
         fig, ax = plt.subplots(1, 1)
-        ax.scatter(r1sel[maskrs], r2sel[maskrs], marker = 'o', c = 'b', s = 5, lw = 0.5)
-        idline = np.linspace (min(np.amin(r1sel[maskrs]),np.amin(r2sel[maskrs])), max(np.amax(r1sel[maskrs]),np.amax(r2sel[maskrs])))
-        ax.plot (idline, idline, 'k--')
-        ax.set_title ('Radii of selected stars for the kernel')
-        ax.set_xlabel ('DECam')
-        ax.set_ylabel ('SOI')
-        figname = os.path.join(outdir,"test_r1selr2sel_o%i.png" % order)
-        fig.savefig(figname, dpi = 300)
+        ax.plot (dmax, fluxratio, 'b-')
+        #ax.axhline (y=1, linestyle='--', color='k')
+        ax.set_xlabel (r'$d_{\rm max}\,[\rm{px}]$')
+        ax.set_ylabel (r'$f_{\rm SOI}/f_{\rm DECam}$')
+        figname = os.path.join(outdir,"test_f1self2sel_dmax_o%i.png" %order)
+        fig.savefig(figname, dpi = 300) 
         
-    # plot fluxes of stars in DECam vs. fluxes of stars in SOI
-    if (doplot) :
-        fig, ax = plt.subplots(1, 1)
-        ax = plt.gca()
-        ax.scatter(f1sel[maskrs], f2sel[maskrs], marker = 'o', c = 'b', s = 10, lw = 0.5, label='used for the empirical psf')
-        ax.scatter(f1sel[-maskrs], f2sel[-maskrs], marker = 'o', c = 'r', s = 10, lw = 0.5, label='not used for the empirical psf')
-        ax.set_yscale('log')
-        ax.set_xscale('log')
-        idline = np.linspace (min(np.amin(f1sel),np.amin(f2sel)), max(np.amax(f1sel),np.amax(f2sel)))
-        ax.plot (idline, idline, 'k--')
-        ax.set_title ('Fluxes of selected stars for the kernel')
-        ax.set_xlabel ('DECam')
-        ax.set_ylabel ('SOI')
-        plt.legend(loc=2, scatterpoints=1, frameon=False)
-        figname = os.path.join(outdir,"test_f1self2sel_o%i.png" % order)
-        fig.savefig(figname, dpi = 300)    
-    
     sys.exit('\n***STOP***\n')
         
     # decide which image to convolve
