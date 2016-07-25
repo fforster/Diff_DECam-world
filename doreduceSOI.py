@@ -40,6 +40,7 @@ import sys, getopt # system commands
 import string # string functions4
 import math
 import numpy as np # numerical tools
+from PIL import Image
 from scipy import linalg as scipylinalg
 from scipy import stats
 from scipy import ndimage
@@ -124,6 +125,9 @@ docrblaster = True
 dosextractor = True
 dowriteto = True
 doplot = True
+
+# option to fix the distance to find isolated stars at 50 pixel
+fix_dmax = True
 
 # background backfilter size
 backsize = 64 # 128
@@ -1181,8 +1185,11 @@ if doconvolve:
         figname = os.path.join(outdir,"test_xrefyref_o%i.png" % order)
         fig.savefig(figname, dpi = 300)
     
-    # loop within distances for selecting isolated stars 
-    dmax = arange(50)+1
+    # loop within distances for selecting isolated stars
+    if fix_dmax : 
+		dmax = [50]
+    else:
+        dmax = arange(50)+1
     fluxratio = []
     
     for idmax in dmax :
@@ -1198,6 +1205,7 @@ if doconvolve:
         e_f2sel = []
         r1sel = []
         r2sel = []
+        list_isource = []
     
         # select stars to train kernel
         for isource in range(len(xref)):
@@ -1247,12 +1255,16 @@ if doconvolve:
             print isource, fluxref[isource], e_fluxref[isource], pixmax1[isource], pixmax2[isource], fluxref[isource], flux[bestmatch], rref[isource], r[bestmatch]
             
             # plot stars
-            #fig, ax = plt.subplots(2, 1)
-            #ax[0].imshow(psf1, interpolation = 'nearest', clim = (np.percentile(psf1, 1), np.percentile(psf1, 99)), origin = 'lower')
-            #ax[1].imshow(psf2, interpolation = 'nearest', clim = (np.percentile(psf2, 1), np.percentile(psf2, 99)), origin = 'lower')
-            #fig.savefig(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
+            if doplot :
+                fig, ax = plt.subplots(2, 1)
+                ax[0].imshow(psf1, interpolation = 'nearest', clim = (np.percentile(psf1, 1), np.percentile(psf1, 99)), origin = 'lower')
+                ax[1].imshow(psf2, interpolation = 'nearest', clim = (np.percentile(psf2, 1), np.percentile(psf2, 99)), origin = 'lower')
+                fig.savefig(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
             
             print "    Adding star..."
+            
+            # save source number 
+            list_isource.append(isource)
             
             # save fluxes
             f1sel.append(fluxref[isource])
@@ -1269,9 +1281,8 @@ if doconvolve:
             else:
                 psf1s = np.dstack([psf1s, psf1])
                 psf2s = np.dstack([psf2s, psf2])
-        
+                
         # count selected stars
-        #print psf1s
         nstars = np.shape(psf1s)[2]
         print "Number of selected stars: %i" % nstars
         
@@ -1295,6 +1306,12 @@ if doconvolve:
         
         if fnstars == 0 :
 	    	sys.exit()
+	    
+	    # show the unmasked selected stars
+        list_isource = np.array(list_isource)
+        for isource in list_isource[maskrs] :
+            img = Image.open(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
+            img.show()
             
         # plot the radii of stars in DECam vs. radii of stars in SOI
         if (doplot) :
@@ -1343,7 +1360,8 @@ if doconvolve:
     fluxratio = np.array(fluxratio)
     fluxratio = 10**fluxratio 
     
-    if (doplot) :
+    # plot flux ratio between DECam ans SOI vs. radius of distance between stars to be isolated
+    if (not fix_dmax) & (doplot) :
         fig, ax = plt.subplots(1, 1)
         ax.plot (dmax, fluxratio, 'b-')
         #ax.axhline (y=1, linestyle='--', color='k')
@@ -1351,8 +1369,6 @@ if doconvolve:
         ax.set_ylabel (r'$f_{\rm SOI}/f_{\rm DECam}$')
         figname = os.path.join(outdir,"test_f1self2sel_dmax_o%i.png" %order)
         fig.savefig(figname, dpi = 300) 
-        
-    sys.exit('\n***STOP***\n')
         
     # decide which image to convolve
     if np.median(r1sel[maskrs]) <= np.median(r2sel[maskrs]):
@@ -1372,7 +1388,7 @@ if doconvolve:
     psf = np.sum(psfs[:, :, maskrs], axis = 2)    # filtering with maskrs
     psf[rs2Dstars > 10] = 0    # removing outside pixels
     psf = psf / np.sum(psf)    # psf normalization
-
+        
     # plot psf
     if doplot:
         fig, ax = plt.subplots()
@@ -1435,19 +1451,20 @@ if doconvolve:
         fig.savefig(figname)
 
     # Compute normalization factor
-    fig, ax = plt.subplots()
-    ax.errorbar(f1sel, f2sel, xerr = e_f1sel, yerr = e_f2sel, marker = '.', lw = 0, elinewidth = 1)
-    normcomp = np.sum(f1sel * f2sel) / np.sum(f1sel * f1sel)
-    ax.plot([0, np.max(f1sel)], [0, np.max(f1sel) * normcomp], ls = ':')
-    if conv1st:
-        ax.plot([0, np.max(f1sel)], [0, np.max(f1sel) * normfilter])
-    else:
-        ax.plot([0, np.max(f1sel) * normfilter], [0, np.max(f1sel)])
-#    solfilter = solfilter / normcomp * normfilter
-    ax.set_xlabel("DECAM [ADU]")
-    ax.set_ylabel("SOAR [ADU]")
-    fig.savefig(filename.replace(".fits", "_fluxcalib.png"))
-
+    if doplot :
+        fig, ax = plt.subplots()
+        ax.errorbar(f1sel, f2sel, xerr = e_f1sel, yerr = e_f2sel, marker = '.', lw = 0, elinewidth = 1)
+        normcomp = np.sum(f1sel * f2sel) / np.sum(f1sel * f1sel)
+        ax.plot([0, np.max(f1sel)], [0, np.max(f1sel) * normcomp], ls = ':')
+        if conv1st:
+            ax.plot([0, np.max(f1sel)], [0, np.max(f1sel) * normfilter])
+        else:
+            ax.plot([0, np.max(f1sel) * normfilter], [0, np.max(f1sel)])
+        # solfilter = solfilter / normcomp * normfilter
+        ax.set_xlabel("DECAM [ADU]")
+        ax.set_ylabel("SOAR [ADU]")
+        fig.savefig(filename.replace(".fits", "_fluxcalib.png"))
+    
     # prepare to apply kernel
     npartx = 1
     nparty = 1
