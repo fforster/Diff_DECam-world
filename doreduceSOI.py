@@ -50,6 +50,7 @@ from astropy.time import Time # new date conversion
 from astropy.io import fits
 
 from datacheck import DECamSNlist, check_by_coordinates    # to load SNHiTS dictionary and update the fits headers
+from resampling import *
 
 from projection import projfast
 from conv2fast import conv2fast
@@ -128,6 +129,9 @@ doplot = True
 
 # option to fix the distance to find isolated stars at 50 pixel
 fix_dmax = True
+
+# option to perform jackknife resampling on the selected sample of stars
+dojackknife = True
 
 # background backfilter size
 backsize = 64 # 128
@@ -1185,6 +1189,13 @@ if doconvolve:
         figname = os.path.join(outdir,"test_xrefyref_o%i.png" % order)
         fig.savefig(figname, dpi = 300)
     
+    # FWHM approximated with the median of stellar radii 
+    fwhm = np.median(rref)
+    print '\nFWHM of stars in reference image: ', fwhm
+    
+    # level of noise to look for contaminating stars (e.g. 0.1 --> signal less than 10% of noise)
+    k = 0.1
+        
     # loop within distances for selecting isolated stars
     if fix_dmax : 
 		dmax = [50]
@@ -1214,24 +1225,54 @@ if doconvolve:
             if not mask[isource] or pixmax1[isource] > 20000 or pixmax2[isource] > 20000:
                 continue
             
-            # remove non-isolated stars
-            distall = np.sqrt((xref[isource] - xref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2 + (yref[isource] - yref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2)
-            if np.min(distall) < idmax:
-                print "Non-isolated star found"
-                continue
-            
-            # remove stars close to the SN position
-            print "Star and supernova position:", xref[isource], yref[isource], coords[1], coords[0]
-            distSN = np.sqrt((xref[isource] - coords[1])**2 + (yref[isource] - coords[0])**2)
-            if distSN < 50:
-                print "Star too close to the supernova"
-                continue
-            
             # take stamps and check size
             psf1 = dataref[int(yref[isource]) - dn: int(yref[isource]) + dn, int(xref[isource]) - dn: int(xref[isource]) + dn]
             psf2 = datanew[int(yref[isource]) - dn: int(yref[isource]) + dn, int(xref[isource]) - dn: int(xref[isource]) + dn]
             if np.shape(psf1) != (2 * dn, 2 * dn) or np.shape(psf2) != (2 * dn, 2 * dn):
                 print "Star stamp is not squared"
+                continue
+            
+            # compute the centre of mass
+            xstar = Xstars - (npsf + nf - 1.) / 2.
+            ystar = Ystars - (npsf + nf - 1.) / 2.
+            intx = np.max(np.cumsum(xstar*psf1))
+            inty = np.max(np.cumsum(ystar*psf1))
+            intf = np.max(np.cumsum(psf1))
+            rcm = (((intx)/(intf))**4.+((inty)/(intf))**4.)**(1./4.)
+                                    
+            # remove non-isolated stars
+            distall = np.sqrt((xref[isource] - xref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2 + (yref[isource] - yref[mask & (xref != xref[isource]) & (yref != yref[isource])])**2)
+            if np.min(distall) < idmax:
+				### saving stars !!! ###
+				# noise of selected star
+                starvar = np.std(psf1[rs2Dstars>=6].flatten())
+                #print 'noise (std) of the selected star: ', starvar
+				# finding fluxes and distances of the closest stars to the selected one
+                starclose = distall<idmax
+                fluxall = fluxref[mask & (xref != xref[isource]) & (yref != yref[isource])]
+                distclose = distall[starclose]
+                fluxclose = fluxall[starclose]
+                # new reduced distance for a star to be considered isolated
+                const = 4*np.log(2)
+                rclose = (fwhm/np.sqrt(const)) * np.sqrt(np.log((fluxclose*const)/(math.pi*fwhm**2.))-np.log(k*starvar))
+                #print 'new distance limits for close (contaminating) stars: ', rclose + math.sqrt(2.)*dn
+                #print 'distances of close (contaminating) stars: ', distclose
+                # condition to exit the loop and reject the selected star
+                isolated = True
+                for iclose in range(len(distclose)) :
+                    if distclose[iclose] <= rclose[iclose] + math.sqrt(2.)*dn :
+                        isolated = False
+                        break
+                print 'isolated: ', isolated
+                if not isolated : 	
+                    print "Non-isolated star found"
+                    continue
+                                
+            # remove stars close to the SN position
+            print "Star and supernova position:", xref[isource], yref[isource], coords[1], coords[0]
+            distSN = np.sqrt((xref[isource] - coords[1])**2 + (yref[isource] - coords[0])**2)
+            if distSN < 50:
+                print "Star too close to the supernova"
                 continue
             
             # remove stars near the edges of the image
@@ -1253,18 +1294,19 @@ if doconvolve:
             
             # print summary
             print isource, fluxref[isource], e_fluxref[isource], pixmax1[isource], pixmax2[isource], fluxref[isource], flux[bestmatch], rref[isource], r[bestmatch]
+          
+            # save source number 
+            list_isource.append(isource)
             
             # plot stars
             if doplot :
                 fig, ax = plt.subplots(2, 1)
                 ax[0].imshow(psf1, interpolation = 'nearest', clim = (np.percentile(psf1, 1), np.percentile(psf1, 99)), origin = 'lower')
                 ax[1].imshow(psf2, interpolation = 'nearest', clim = (np.percentile(psf2, 1), np.percentile(psf2, 99)), origin = 'lower')
+                ax[0].set_title('#: %i    # in SExtractor: %05i\ndist of closets: %i    rcm: %.2f' %(len(list_isource),isource,np.min(distall),rcm))
                 fig.savefig(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
             
             print "    Adding star..."
-            
-            # save source number 
-            list_isource.append(isource)
             
             # save fluxes
             f1sel.append(fluxref[isource])
@@ -1286,6 +1328,14 @@ if doconvolve:
         nstars = np.shape(psf1s)[2]
         print "Number of selected stars: %i" % nstars
         
+        # jackknife resampling 
+        '''
+        it is an estimate of the bias introduced by selecting a specific sample
+        '''
+        #if dojackknife :
+		#	mpsf1s, mpsf2s, mf1sel, me_f1sel, mf2sel, me_f2sel, mr1sel, mr2sel = jackknife (psf1s, psf2s, f1sel, e_f1sel, f2sel, e_f2sel, r1sel, r2sel)			
+        #sys.exit('***STOP***')
+        
         ### empirical psf ###
         
         # select only stars for empirical psf
@@ -1300,7 +1350,7 @@ if doconvolve:
         r2mad = np.median (np.absolute(r2sel - np.median(r2sel)))
         maskrs = (r1sel > np.median(r1sel) - r1mad) & (r1sel < np.median(r1sel) + r1mad) & (r2sel > np.median(r2sel) - r2mad) & (r2sel < np.median(r2sel) + r2mad) & (f1sel > 0) & (f2sel > 0)
             
-        # count finally selected stars
+        # count stars surviving the mad cut
         fnstars = np.sum(maskrs)
         print "Number of unmasked selected stars: %i" % fnstars
         
@@ -1308,10 +1358,11 @@ if doconvolve:
 	    	sys.exit()
 	    
 	    # show the unmasked selected stars
-        list_isource = np.array(list_isource)
-        for isource in list_isource[maskrs] :
-            img = Image.open(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
-            img.show()
+        if doplot :
+            list_isource = np.array(list_isource)
+            for isource in list_isource[maskrs] :
+                img = Image.open(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
+                img.show()
             
         # plot the radii of stars in DECam vs. radii of stars in SOI
         if (doplot) :
@@ -1369,6 +1420,16 @@ if doconvolve:
         ax.set_ylabel (r'$f_{\rm SOI}/f_{\rm DECam}$')
         figname = os.path.join(outdir,"test_f1self2sel_dmax_o%i.png" %order)
         fig.savefig(figname, dpi = 300) 
+    
+    ### manual selection of stars ###
+    # update maskrs
+    string_input = raw_input('input the numbers of stars you want to reject\nseparated by space (e.g. "1 14 23 30"): ')
+    input_list = string_input.split()
+    input_list = [int(a)-1 for a in input_list]
+    maskrs[input_list] = -maskrs[input_list]
+    # count final number of selected stars
+    finalnstars = np.sum(maskrs)
+    print "Final number of manually selected stars: %i" % finalnstars
         
     # decide which image to convolve
     if np.median(r1sel[maskrs]) <= np.median(r2sel[maskrs]):
@@ -1602,33 +1663,34 @@ if dophotometry:
     psfmasked[np.invert(maskphoto)] = 0
 
     # plot regions around SNe
-    fig, ax = plt.subplots(2, 4, figsize = (12, 6))
-    im = ax[0, 0].imshow(imref, interpolation = 'nearest', origin = 'lower')
-    ax[0, 0].set_title("imref", fontsize = 6)
-    im = ax[0, 1].imshow(imnew, interpolation = 'nearest', origin = 'lower')
-    ax[0, 1].set_title("imnew", fontsize = 6)
-    if conv1st:
-        convlabel = 'imref_conv'
-    else:
-        convlabel = 'imnew_conv'
-    im = ax[0, 2].imshow(imconv, interpolation = 'nearest', origin = 'lower')
-    ax[0, 2].set_title(convlabel, fontsize = 6)
-    im = ax[0, 3].imshow(diff, interpolation = 'nearest', origin = 'lower')
-    ax[0, 3].contour(psfmasked, alpha = 0.3)
-    ax[0, 3].set_title("diff", fontsize = 6)
-    im = ax[1, 0].imshow(weights, interpolation = 'nearest', origin = 'lower')
-    ax[1, 0].contour(psfmasked)
-    ax[1, 0].set_title("weights", fontsize = 6)
-    im = ax[1, 1].imshow(psfmasked, interpolation = 'nearest', origin = 'lower')
-    ax[1, 1].contour(psfmasked)
-    ax[1, 1].set_title("psf", fontsize = 6)
-    im = ax[1, 2].imshow(var, interpolation = 'nearest', origin = 'lower')
-    ax[1, 2].contour(rs2Dstars)
-    ax[1, 2].set_title("variance", fontsize = 6)
-    im = ax[1, 3].imshow(snr, interpolation = 'nearest', origin = 'lower')
-    ax[1, 3].contour(psfmasked)
-    ax[1, 3].set_title("snr", fontsize = 6)
-    plt.savefig(filename.replace(".fits", "_supernova.png"), bbox_inches = 'tight', pad_inches = 0.01)
+    if doplot :
+        fig, ax = plt.subplots(2, 4, figsize = (12, 6))
+        im = ax[0, 0].imshow(imref, interpolation = 'nearest', origin = 'lower')
+        ax[0, 0].set_title("imref", fontsize = 6)
+        im = ax[0, 1].imshow(imnew, interpolation = 'nearest', origin = 'lower')
+        ax[0, 1].set_title("imnew", fontsize = 6)
+        if conv1st:
+            convlabel = 'imref_conv'
+        else:
+            convlabel = 'imnew_conv'
+        im = ax[0, 2].imshow(imconv, interpolation = 'nearest', origin = 'lower')
+        ax[0, 2].set_title(convlabel, fontsize = 6)
+        im = ax[0, 3].imshow(diff, interpolation = 'nearest', origin = 'lower')
+        ax[0, 3].contour(psfmasked, alpha = 0.3)
+        ax[0, 3].set_title("diff", fontsize = 6)
+        im = ax[1, 0].imshow(weights, interpolation = 'nearest', origin = 'lower')
+        ax[1, 0].contour(psfmasked)
+        ax[1, 0].set_title("weights", fontsize = 6)
+        im = ax[1, 1].imshow(psfmasked, interpolation = 'nearest', origin = 'lower')
+        ax[1, 1].contour(psfmasked)
+        ax[1, 1].set_title("psf", fontsize = 6)
+        im = ax[1, 2].imshow(var, interpolation = 'nearest', origin = 'lower')
+        ax[1, 2].contour(rs2Dstars)
+        ax[1, 2].set_title("variance", fontsize = 6)
+        im = ax[1, 3].imshow(snr, interpolation = 'nearest', origin = 'lower')
+        ax[1, 3].contour(psfmasked)
+        ax[1, 3].set_title("snr", fontsize = 6)
+        plt.savefig(filename.replace(".fits", "_supernova.png"), bbox_inches = 'tight', pad_inches = 0.01)
 
     # compute flux
     flux = np.sum(weights * diff)
