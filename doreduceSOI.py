@@ -1197,6 +1197,15 @@ if doconvolve:
     k = 0.1
         
     # loop within distances for selecting isolated stars
+    '''
+    Leave this loop DISABLED! 
+    Otherwise you end up performing 50 manual selections of stars.
+    The code will anyhow work with the loop and only the final set of stars with distance 50 pixels to select isolated stars
+    will be passed to the rest of the code. 
+    When enabled, this loop tests the effect of reducing the distance to select isolated stars.
+    We already noticed how a stable number of selected stars is reached down a threashold distance in pixels for isolation criterium,
+    although the psf is not reliable since too close stars contaminate the selected ones!
+    '''
     if fix_dmax : 
 		dmax = [50]
     else:
@@ -1265,7 +1274,7 @@ if doconvolve:
                         break
                 print 'isolated: ', isolated
                 if not isolated : 	
-                    print "Non-isolated star found"
+                    #print "Non-isolated star found"
                     continue
                                 
             # remove stars close to the SN position
@@ -1328,21 +1337,7 @@ if doconvolve:
         nstars = np.shape(psf1s)[2]
         print "Number of selected stars: %i" % nstars
         
-        # jackknife resampling 
-        '''
-        it is an estimate of the bias introduced by selecting a specific sample
-        '''
-        #if dojackknife :
-		#	mpsf1s, mpsf2s, mf1sel, me_f1sel, mf2sel, me_f2sel, mr1sel, mr2sel = jackknife (psf1s, psf2s, f1sel, e_f1sel, f2sel, e_f2sel, r1sel, r2sel)			
-        #sys.exit('***STOP***')
-        
-        ### empirical psf ###
-        
         # select only stars for empirical psf
-        r1sel = np.array(r1sel)
-        r2sel = np.array(r2sel)
-        f1sel = np.array(f1sel)
-        f2sel = np.array(f2sel)
         #ravg = (r1sel + r2sel) / 2.
         #maskrs = (ravg < np.percentile(ravg, 75)) & (f1sel > 0) & (f2sel > 0)
         # new criterium
@@ -1357,23 +1352,44 @@ if doconvolve:
         if fnstars == 0 :
 	    	sys.exit()
 	    
-	    # show the unmasked selected stars
+	    # show the selected stars (after the mad cut)
+        list_isource = np.array(list_isource)
         if doplot :
-            list_isource = np.array(list_isource)
             for isource in list_isource[maskrs] :
                 img = Image.open(filename.replace(".fits", "_kernelstar_%05i.png" % isource))
                 img.show()
-            
-        # plot the radii of stars in DECam vs. radii of stars in SOI
+        
+        ### manual selection of stars ###
+        # reject stars
+        string_input = raw_input('Input the stars you want to reject.\nUse the numbers in the upper-right corner of each image\nseparated by space (e.g. "1 14 23 30"): ')
+        input_list = string_input.split()
+        input_list = [int(a)-1 for a in input_list]
+        # update maskrs
+        maskrs[input_list] = -maskrs[input_list]
+        # update saved stars
+        f1sel = np.array(f1sel)
+        e_f1sel = np.array(e_f1sel)
+        f2sel = np.array(f2sel)
+        e_f2sel = np.array(e_f2sel)
+        r1sel = np.array(r1sel)
+        r2sel = np.array(r2sel)
+        # count final number of selected stars
+        finalnstars = np.sum(maskrs)
+        print "Final number of manually selected stars: %i" % finalnstars
+        	    
+	    # plot the radii of stars in DECam vs. radii of stars in SOI
         if (doplot) :
             if idmax % 5 == 0 :
                 fig, ax = plt.subplots(1, 1)
-                ax.scatter(r1sel[maskrs], r2sel[maskrs], marker = 'o', c = 'b', s = 5, lw = 0.5)
-                idline = np.linspace (min(np.amin(r1sel[maskrs]),np.amin(r2sel[maskrs])), max(np.amax(r1sel[maskrs]),np.amax(r2sel[maskrs])))
+                ax.scatter(r1sel[maskrs], r2sel[maskrs], marker = 'o', c = 'b', s = 10, lw = 0.5, label='used for the empirical psf (%i)' %len(r1sel[maskrs]))
+                ax.scatter(r1sel[-maskrs], r2sel[-maskrs], marker = 'o', c = 'k', s = 10, lw = 0.5, label='not used for the empirical psf (%i)' %(len(r1sel[-maskrs])-len(input_list)))
+                ax.scatter(r1sel[-maskrs[input_list]], r2sel[-maskrs[input_list]], marker = 'o', c = 'r', s = 10, lw = 0.5, label='manually rejected (%i)' %len(input_list))
+                idline = np.linspace (min(np.amin(r1sel),np.amin(r2sel)), max(np.amax(r1sel),np.amax(r2sel)))
                 ax.plot (idline, idline, 'k--')
                 ax.set_title ('Radii of selected stars for the kernel')
                 ax.set_xlabel (r'$r_{\rm DECam}\,[\rm{ADU}]$')
                 ax.set_ylabel (r'$r_{\rm SOI}\,[\rm{ADU}]$')
+                plt.legend(loc=2, scatterpoints=1, frameon=False)
                 figname = os.path.join(outdir,"test_r1selr2sel_o%i_D%i.png" %(order,idmax))
                 fig.savefig(figname, dpi = 300)
         
@@ -1390,8 +1406,9 @@ if doconvolve:
             if idmax % 5 == 0 :
                 fig, ax = plt.subplots(1, 1)
                 #ax = plt.gca()
-                ax.scatter(logf1sel, logf2sel, marker = 'o', c = 'b', s = 10, lw = 0.5, label='used for the empirical psf (%i)' %fnstars)
-                ax.scatter(np.log10(f1sel[-maskrs]), np.log10(f2sel[-maskrs]), marker = 'o', c = 'r', s = 10, lw = 0.5, label='not used for the empirical psf (%i)' %(nstars-fnstars))
+                ax.scatter(logf1sel, logf2sel, marker = 'o', c = 'b', s = 10, lw = 0.5, label='used for the empirical psf (%i)' %len(logf1sel))
+                ax.scatter(np.log10(f1sel[-maskrs]), np.log10(f2sel[-maskrs]), marker = 'o', c = 'k', s = 10, lw = 0.5, label='not used for the empirical psf (%i)' %(len(f1sel[-maskrs])-len(input_list)))
+                ax.scatter(np.log10(f1sel[-maskrs[input_list]]), np.log10(f2sel[-maskrs[input_list]]), marker = 'o', c = 'r', s = 10, lw = 0.5, label='manually rejected (%i)' %len(input_list))
                 #ax.set_yscale('log')
                 #ax.set_xscale('log')
                 #idline = np.linspace (min(np.amin(f1sel),np.amin(f2sel)), max(np.amax(f1sel),np.amax(f2sel)))
@@ -1421,173 +1438,224 @@ if doconvolve:
         figname = os.path.join(outdir,"test_f1self2sel_dmax_o%i.png" %order)
         fig.savefig(figname, dpi = 300) 
     
-    ### manual selection of stars ###
-    # update maskrs
-    string_input = raw_input('input the numbers of stars you want to reject\nseparated by space (e.g. "1 14 23 30"): ')
-    input_list = string_input.split()
-    input_list = [int(a)-1 for a in input_list]
-    maskrs[input_list] = -maskrs[input_list]
-    # count final number of selected stars
-    finalnstars = np.sum(maskrs)
-    print "Final number of manually selected stars: %i" % finalnstars
+    # update saved stars
+    '''
+    Empirical PSF --> Applied Kernel --> Convolution 
+    based on the final selected stars, i.e. after
+    1) applying the selection criteria
+    2) cutting according to MAD between stellar radii in SOI DECam
+    3) Manual rejection of stars
+    '''
+    f1sel = f1sel[maskrs]
+    e_f1sel = e_f1sel[maskrs]
+    f2sel = f2sel[maskrs]
+    e_f2sel = e_f2sel[maskrs]
+    r1sel = r1sel[maskrs]
+    r2sel = r2sel[maskrs]
+    list_isource = list_isource[maskrs]
+    psf1s = psf1s[:,:,maskrs]
+    psf2s = psf2s[:,:,maskrs]
+            
+    # jackknife resampling
+    '''
+    This estimates the bias introduced by selecting a specific sample of stars to train the kernel
+    '''
+    if dojackknife :
+        print '\nDoing Resampling...\n'
+        res_psf1s, res_psf2s, res_f1sel, res_e_f1sel, res_f2sel, res_e_f2sel, res_r1sel, res_r2sel, res_isourcelist = jackknife (psf1s, psf2s, f1sel, e_f1sel, f2sel, e_f2sel, r1sel, r2sel, list_isource)			
+        inlist = [''] + range(finalnstars)
+    else :
+		inlist = ['']
         
-    # decide which image to convolve
-    if np.median(r1sel[maskrs]) <= np.median(r2sel[maskrs]):
-	    conv1st = True
-    else:
-        conv1st = False
-    print np.median(r1sel[maskrs]), np.median(r2sel[maskrs]), "--> conv1st:", conv1st
+    for j in inlist :    # loop for jacknife resampling --> first over the whole sample (of dimension finalstars) and the over the subsamples (of dimension finalstars-1)
         
-    # infere empirical psf
-    if conv1st:
-        psfs = np.array(psf2s)
-    else:
-        psfs = np.array(psf1s)
-    #for i in range(nstars):
-    #    if maskrs[i]:
-    #        psfs[:, :, i] = psfs[:, :, i] / np.abs(np.sum(psfs[:, :, i]))
-    psf = np.sum(psfs[:, :, maskrs], axis = 2)    # filtering with maskrs
-    psf[rs2Dstars > 10] = 0    # removing outside pixels
-    psf = psf / np.sum(psf)    # psf normalization
+        #print np.shape(res_psf1s)
         
-    # plot psf
-    if doplot:
-        fig, ax = plt.subplots()
-        im = ax.imshow(psf, interpolation = 'nearest', origin = 'lower')
-        fig.colorbar(im)
-        figname = os.path.join(outdir,"psf_o%i.png" % order)
-        fig.savefig(figname)
-    
-    # start building kernel
-    X = np.zeros((nstars * npsf2, nvar))
-    Y = np.zeros(nstars * npsf2)
+        if (dojackknife) & (j!='') :
+            psf1s = res_psf1s[j]
+            psf2s = res_psf2s[j]
+            f1sel = res_f1sel[j]
+            e_f1sel = res_e_f1sel[j]
+            f2sel = res_f2sel[j]
+            e_f2sel = res_e_f2sel[j]
+            r1sel = res_r1sel[j]
+            r2sel = res_r2sel[j]
+            list_isource = res_isourcelist[j]
+            if j==0 :
+                finalnstars = finalnstars - 1    # correct for the new dimension of axis 2 of psf1s (axis 2) and kernel
+        #print np.shape(psf1s)
+            
+        ### empirical psf ###
+        
+        # decide which image to convolve
+        if np.median(r1sel) <= np.median(r2sel):    #if np.median(r1sel[maskrs]) <= np.median(r2sel[maskrs]):
+	        conv1st = True
+        else:
+            conv1st = False
+        print np.median(r1sel), np.median(r2sel), "--> conv1st:", conv1st
+        
+        # infere empirical psf
+        if conv1st:
+            psfs = np.array(psf2s)
+        else:
+            psfs = np.array(psf1s)
+        #for i in range(nstars):
+        #    if maskrs[i]:
+        #        psfs[:, :, i] = psfs[:, :, i] / np.abs(np.sum(psfs[:, :, i]))
+        psf = np.sum(psfs, axis = 2)    #psf = np.sum(psfs[:, :, maskrs], axis = 2)    # filtering with maskrs
+        psf[rs2Dstars > 10] = 0    # removing outside pixels
+        psf = psf / np.sum(psf)    # psf normalization
+        
+        # plot psf
+        if doplot:
+            fig, ax = plt.subplots()
+            im = ax.imshow(psf, interpolation = 'nearest', origin = 'lower')
+            fig.colorbar(im)
+            figname = os.path.join(outdir,"psf%s_o%i.png" %(j,order))
+            fig.savefig(figname)
+            
+        # start building kernel
+        #X = np.zeros((nstars * npsf2, nvar))
+        #Y = np.zeros(nstars * npsf2)
+        X = np.zeros((finalnstars * npsf2, nvar))
+        Y = np.zeros(finalnstars * npsf2)
+                        
+        # loop among stars
+        #for i in range(nstars):
+        for i in range(finalnstars):
+        
+            psf1 = psf1s[:, :, i]
+            psf2 = psf2s[:, :, i]
+                    
+            # fill kernel equations
+            for k in range(nf):
+                for l in range(nf):
+                    ivar = ivarf[k, l]
+                    if ivar == -1:
+                        continue
+                    if conv1st:
+                        X[i * npsf2: (i + 1) * npsf2, ivar] \
+                            = X[i * npsf2: (i + 1) * npsf2, ivar] + psf1[ieq2i + k, ieq2j + l]
+                    else:
+                        X[i * npsf2: (i + 1) * npsf2, ivar] \
+                            = X[i * npsf2: (i + 1) * npsf2, ivar] + psf2[ieq2i + k, ieq2j + l]
+            if conv1st:
+                Y[i * npsf2: (i + 1) * npsf2] = psf2[nfh: -(nfh + 1), nfh: -(nfh + 1)][ieq2i, ieq2j]
+            else:
+                Y[i * npsf2: (i + 1) * npsf2] = psf1[nfh: -(nfh + 1), nfh: -(nfh + 1)][ieq2i, ieq2j]
 
-    # loop among stars
-    for i in range(nstars):
 
-        psf1 = psf1s[:, :, i]
-        psf2 = psf2s[:, :, i]
-
-        # fill kernel equations
+        # solve filter
+        mat = np.dot(X.transpose(), X)
+        rhs = np.dot(X.transpose(), Y)
+        solvars = scipylinalg.solve(mat, rhs)
+        
+        # recover filter
+        solfilter = np.zeros((nf, nf))
         for k in range(nf):
             for l in range(nf):
-                ivar = ivarf[k, l]
+                ivar = int(ivarf[k, l])
                 if ivar == -1:
+                    solfilter[k, l] = 0
                     continue
-                if conv1st:
-                    X[i * npsf2: (i + 1) * npsf2, ivar] \
-                        = X[i * npsf2: (i + 1) * npsf2, ivar] + psf1[ieq2i + k, ieq2j + l]
-                else:
-                    X[i * npsf2: (i + 1) * npsf2, ivar] \
-                        = X[i * npsf2: (i + 1) * npsf2, ivar] + psf2[ieq2i + k, ieq2j + l]
-        if conv1st:
-            Y[i * npsf2: (i + 1) * npsf2] = psf2[nfh: -(nfh + 1), nfh: -(nfh + 1)][ieq2i, ieq2j]
-        else:
-            Y[i * npsf2: (i + 1) * npsf2] = psf1[nfh: -(nfh + 1), nfh: -(nfh + 1)][ieq2i, ieq2j]
-
-
-    # solve filter
-    mat = np.dot(X.transpose(), X)
-    rhs = np.dot(X.transpose(), Y)
-    solvars = scipylinalg.solve(mat, rhs)
-
-    # recover filter
-    solfilter = np.zeros((nf, nf))
-    for k in range(nf):
-        for l in range(nf):
-            ivar = int(ivarf[k, l])
-            if ivar == -1:
-                solfilter[k, l] = 0
-                continue
-            solfilter[k, l] = solvars[ivar]
-    normfilter = np.sum(solfilter.flatten())
-    print "normfilter: ", normfilter
+                solfilter[k, l] = solvars[ivar]
+        normfilter = np.sum(solfilter.flatten())
+        print "normfilter: ", normfilter
     
-    # plot filter
-    if doplot:
-        fig, ax = plt.subplots()
-        im = ax.imshow(solfilter, interpolation = 'nearest', origin = 'lower')
-        fig.colorbar(im)
-        figname = os.path.join(outdir,"solfilter_o%i.png" % order)
-        fig.savefig(figname)
+        # plot filter
+        if doplot:
+            fig, ax = plt.subplots()
+            im = ax.imshow(solfilter, interpolation = 'nearest', origin = 'lower')
+            fig.colorbar(im)
+            figname = os.path.join(outdir,"solfilter%s_o%i.png" %(j,order))
+            fig.savefig(figname)
 
-    # Compute normalization factor
-    if doplot :
-        fig, ax = plt.subplots()
-        ax.errorbar(f1sel, f2sel, xerr = e_f1sel, yerr = e_f2sel, marker = '.', lw = 0, elinewidth = 1)
-        normcomp = np.sum(f1sel * f2sel) / np.sum(f1sel * f1sel)
-        ax.plot([0, np.max(f1sel)], [0, np.max(f1sel) * normcomp], ls = ':')
-        if conv1st:
-            ax.plot([0, np.max(f1sel)], [0, np.max(f1sel) * normfilter])
-        else:
-            ax.plot([0, np.max(f1sel) * normfilter], [0, np.max(f1sel)])
-        # solfilter = solfilter / normcomp * normfilter
-        ax.set_xlabel("DECAM [ADU]")
-        ax.set_ylabel("SOAR [ADU]")
-        fig.savefig(filename.replace(".fits", "_fluxcalib.png"))
+        # Compute normalization factor
+        if doplot :
+            fig, ax = plt.subplots()
+            ax.errorbar(f1sel, f2sel, xerr = e_f1sel, yerr = e_f2sel, marker = '.', lw = 0, elinewidth = 1)
+            normcomp = np.sum(f1sel * f2sel) / np.sum(f1sel * f1sel)
+            ax.plot([0, np.max(f1sel)], [0, np.max(f1sel) * normcomp], ls = ':')
+            if conv1st:
+                ax.plot([0, np.max(f1sel)], [0, np.max(f1sel) * normfilter])
+            else:
+                ax.plot([0, np.max(f1sel) * normfilter], [0, np.max(f1sel)])
+            # solfilter = solfilter / normcomp * normfilter
+            ax.set_xlabel("DECAM [ADU]")
+            ax.set_ylabel("SOAR [ADU]")
+            fig.savefig(filename.replace(".fits", "_fluxcalib%s.png" %j))
     
-    # prepare to apply kernel
-    npartx = 1
-    nparty = 1
-    dxconv = (nx1 - nf) / nparty
-    dyconv = (ny1 - nf) / npartx
-
-    ipart = 0
-    jpart = 0
-    i1 = nfh + dxconv * ipart
-    i2 = i1 + dxconv
-    j1 = nfh + dyconv * jpart
-    j2 = j1 + dyconv
-
-    # make sure arrays are in float32
-    dataref = float32(dataref)
-    datanew = float32(datanew)
-    
-    # apply kernel
-    print "Doing convolution..."
-    if conv1st:
-        conv2fast.conv(dxconv + nf - 1, dyconv + nf - 1, dxconv, dyconv, nf, solfilter, dataref[i1 - nfh: i2 + nfh, j1 - nfh: j2 + nfh])
-    else:
-        conv2fast.conv(dxconv + nf - 1, dyconv + nf - 1, dxconv, dyconv, nf, solfilter, datanew[i1 - nfh: i2 + nfh, j1 - nfh: j2 + nfh])
+        # prepare to apply kernel
+        npartx = 1
+        nparty = 1
+        dxconv = (nx1 - nf) / nparty
+        dyconv = (ny1 - nf) / npartx
         
-    datat = np.empty_like(datanew)
+        ipart = 0
+        jpart = 0
+        i1 = nfh + dxconv * ipart
+        i2 = i1 + dxconv
+        j1 = nfh + dyconv * jpart
+        j2 = j1 + dyconv
 
-    # recover and save solution
-    datat[i1: i2, j1: j2] = conv2fast.iout[0: dxconv, 0: dyconv]
-    if dowriteto :
-        print "Saving solution..."
-        conv = fits.PrimaryHDU(data = float32(datat), header = headerref)
-        conv.writeto(filename.replace(".fits", "_conv.fits"), clobber = True)
+        # make sure arrays are in float32
+        dataref = float32(dataref)
+        datanew = float32(datanew)
+        
+        # apply kernel
+        print "Doing convolution..."
+        if j=='' :
+			print 'with kernel from the whole sample of %s stars...' %finalnstars
+        else :
+			print 'with kernel from the subsample of %s stars (left star number %i out)...' %(finalnstars,j+1)
+        if conv1st:
+            conv2fast.conv(dxconv + nf - 1, dyconv + nf - 1, dxconv, dyconv, nf, solfilter, dataref[i1 - nfh: i2 + nfh, j1 - nfh: j2 + nfh])
+        else:
+            conv2fast.conv(dxconv + nf - 1, dyconv + nf - 1, dxconv, dyconv, nf, solfilter, datanew[i1 - nfh: i2 + nfh, j1 - nfh: j2 + nfh])
+            
+        datat = np.empty_like(datanew)
+        
+        # recover and save solution
+        datat[i1: i2, j1: j2] = conv2fast.iout[0: dxconv, 0: dyconv]
+        if dowriteto :
+            print "Saving solution..."
+            conv = fits.PrimaryHDU(data = float32(datat), header = headerref)
+            conv.writeto(filename.replace(".fits", "_conv%s.fits" %j), clobber = True)
 
-    # difference
-    if conv1st:
-        diff = datanew - datat
-    else:
-        diff = datat - dataref
-    if dowriteto :    
-        difffits = fits.PrimaryHDU(data = float32(diff), header = headerref)
-        difffits.writeto(filename.replace(".fits", "_diff.fits"), clobber = True)
+        # difference
+        if conv1st:
+            diff = datanew - datat
+        else:
+            diff = datat - dataref
+        if dowriteto :    
+            difffits = fits.PrimaryHDU(data = float32(diff), header = headerref)
+            difffits.writeto(filename.replace(".fits", "_diff%s.fits" %j), clobber = True)
     
-    # variance of the difference
-    if conv1st:
-        vardiff = varref * normfilter**2 + varnew
-    else:
-        vardiff = varref + varnew * normfilter**2
+        # variance of the difference
+        if conv1st:
+            vardiff = varref * normfilter**2 + varnew
+        else:
+            vardiff = varref + varnew * normfilter**2
     
-    # variance
-    if dowriteto :
-        varfits = fits.PrimaryHDU(data = float32(vardiff), header = headerref)
-        varfits.writeto(filename.replace(".fits", "_vardiff.fits"), clobber = True)
+        # variance
+        if dowriteto :
+            varfits = fits.PrimaryHDU(data = float32(vardiff), header = headerref)
+            varfits.writeto(filename.replace(".fits", "_vardiff%s.fits" %j), clobber = True)
 
-    # snr
-    if dowriteto :
-        snrfits = fits.PrimaryHDU(data = float32(diff / np.sqrt(vardiff)), header = headerref)
-        snrfits.writeto(filename.replace(".fits", "_snrdiff.fits"), clobber = True)
-
-    # save psf and conv1st
-    np.save(filename.replace(".fits", "_conv1st.npy"), conv1st)
-    np.save(filename.replace(".fits", "_psf.npy"), psf)
-    np.save(filename.replace(".fits", "_solfilter.npy"), solfilter)
+        # snr
+        if dowriteto :
+            snrfits = fits.PrimaryHDU(data = float32(diff / np.sqrt(vardiff)), header = headerref)
+            snrfits.writeto(filename.replace(".fits", "_snrdiff%s.fits" %j), clobber = True)
+        
+        # save list of selected stars
+        if j=='' :
+            np.save(filename.replace(".fits", "_isourcelist.npy"), list_isource)
+        
+        # save psf and conv1st
+        np.save(filename.replace(".fits", "_conv1st%s.npy" %j), conv1st)
+        np.save(filename.replace(".fits", "_psf%s.npy" %j), psf)
+        np.save(filename.replace(".fits", "_solfilter%s.npy" %j), solfilter)
+    
     
 if dophotometry:
     
@@ -1596,160 +1664,219 @@ if dophotometry:
     # filename
     filename = "%s/%s_%s_final_nosky_DECam_o%i.fits" % (outdir, supernova, filter, order)
     MJD = float(fits.open(filename)[0].header['MJD-OBS'])
-
-    # open metadata
-    conv1st = np.load(filename.replace(".fits", "_conv1st.npy"))
-    psf = np.load(filename.replace(".fits", "_psf.npy"))
-    solfilter = np.load(filename.replace(".fits", "_solfilter.npy"))
-    normpsf = np.sum(psf)
-    normfilter = np.sum(solfilter)
-    print 'conv1st =', conv1st, 'normfilter =', normfilter, 'normpsf =', normpsf
-
-    ## plot psf and solfilter
-    #if doplot:
-    #    fig, ax = plt.subplots()
-    #    im = ax.imshow(psf, interpolation = 'nearest', origin = 'lower')
-    #    fig.colorbar(im)
-    #    figname = os.path.join(outdir,"psf_o%i.png" % order)
-    #    fig.savefig(figname)
-    #    
-    #    fig, ax = plt.subplots()
-    #    im = ax.imshow(solfilter, interpolation = 'nearest', origin = 'lower')
-    #    fig.colorbar(im)
-    #    figname = os.path.join(outdir,"solfilter_o%i.png" % order)
-    #    fig.savefig(figname)
-        
-    print rs2Dstars.flatten()[np.argmax(psf.flatten())]    # ???
-
-    # open original image, convolved image and subtraction image
-    imref = fits.open(fitsref)[0].data
-    imnew = fits.open(filename)[0].data
-    imconv = fits.open(filename.replace(".fits", "_conv.fits"))[0].data
-
-    # open difference and variance maps
-    diff = fits.open(filename.replace(".fits", "_diff.fits"))[0].data
-    var = fits.open(filename.replace(".fits", "_vardiff.fits"))[0].data
-    snr = diff / var
-
-    # do better centering (maybe try doing some previous filtering?)
-    (ix, iy) = coords
-    print "Before centering --> ix: %s, iy: %s" % (ix, iy)
-    aux = ndimage.filters.gaussian_filter(diff[ix - 2: ix + 2, iy - 2: iy + 2], 4.)
-    (dx, dy) = np.unravel_index(np.argmax(aux), np.shape(aux))
-    print 'After centering -->'
-    print "dx: %s, dy: %s" % (dx, dy)
-    ix = ix + (dx - 1) * 0.5
-    iy = iy + (dy - 1) * 0.5
-    print "ix: %s, iy: %s" % (ix, iy)
-        
-    # mask for region to be included in the photometry
-    maskphoto = (psf >= 0.2 * np.max(psf)) & (rs2Dstars < 4)
-    imref = imref[ix - dn: ix + dn, iy - dn: iy + dn]
-    imnew = imnew[ix - dn: ix + dn, iy - dn: iy + dn]
-    imconv = imconv[ix - dn: ix + dn, iy - dn: iy + dn]
-    diff = diff[ix - dn: ix + dn, iy - dn: iy + dn]
-    var = var[ix - dn: ix + dn, iy - dn: iy + dn]
-    snr = snr[ix - dn: ix + dn, iy - dn: iy + dn]
-
-    # raw sum
-    print "Raw sum:", np.sum(diff[maskphoto])
-
-    # compute weights
-    weights = np.array(psf / var / np.sum(psf[maskphoto]**2 / var[maskphoto]))
-    weights[np.invert(maskphoto)] = 0
     
-    # psf masked
-    psfmasked = np.array(psf)
-    psfmasked[np.invert(maskphoto)] = 0
-
-    # plot regions around SNe
-    if doplot :
-        fig, ax = plt.subplots(2, 4, figsize = (12, 6))
-        im = ax[0, 0].imshow(imref, interpolation = 'nearest', origin = 'lower')
-        ax[0, 0].set_title("imref", fontsize = 6)
-        im = ax[0, 1].imshow(imnew, interpolation = 'nearest', origin = 'lower')
-        ax[0, 1].set_title("imnew", fontsize = 6)
+    # recover the list of stars used for the kernel
+    list_isource = np.load(filename.replace(".fits", "_isourcelist.npy"))
+    finalnstars = len(list_isource)
+    inlist = [''] + range(finalnstars)
+    
+    # fluxes  and flux pseudovalues to estimate the resampling 95% interval of confidence
+    fluxlist = []
+    pseudoflux = []
+            
+    for j in inlist :    # loop for jacknife resampling
+        
+        # open metadata
+        conv1st = np.load(filename.replace(".fits", "_conv1st%s.npy" %j))
+        psf = np.load(filename.replace(".fits", "_psf%s.npy" %j))
+        solfilter = np.load(filename.replace(".fits", "_solfilter%s.npy" %j))
+        normpsf = np.sum(psf)
+        normfilter = np.sum(solfilter)
+        print 'conv1st =', conv1st, 'normfilter =', normfilter, 'normpsf =', normpsf
+        
+        print rs2Dstars.flatten()[np.argmax(psf.flatten())]    
+        
+        # open original image, convolved image and subtraction image
+        imref = fits.open(fitsref)[0].data
+        imnew = fits.open(filename)[0].data
+        imconv = fits.open(filename.replace(".fits", "_conv%s.fits" %j))[0].data
+        
+        # open difference and variance maps
+        diff = fits.open(filename.replace(".fits", "_diff%s.fits" %j))[0].data
+        var = fits.open(filename.replace(".fits", "_vardiff%s.fits" %j))[0].data
+        snr = diff / var
+        
+        # do better centering (maybe try doing some previous filtering?)
+        if j=='' :
+            (ix, iy) = coords
+            print "Before centering --> ix: %s, iy: %s" % (ix, iy)
+            aux = ndimage.filters.gaussian_filter(diff[ix - 2: ix + 2, iy - 2: iy + 2], 4.)
+            (dx, dy) = np.unravel_index(np.argmax(aux), np.shape(aux))
+            print 'After centering -->'
+            print "dx: %s, dy: %s" % (dx, dy)
+            ix = ix + (dx - 1) * 0.5
+            iy = iy + (dy - 1) * 0.5
+            print "ix: %s, iy: %s" % (ix, iy)
+        
+        # mask for region to be included in the photometry
+        maskphoto = (psf >= 0.2 * np.max(psf)) & (rs2Dstars < 4)
+        imref = imref[ix - dn: ix + dn, iy - dn: iy + dn]
+        imnew = imnew[ix - dn: ix + dn, iy - dn: iy + dn]
+        imconv = imconv[ix - dn: ix + dn, iy - dn: iy + dn]
+        diff = diff[ix - dn: ix + dn, iy - dn: iy + dn]
+        var = var[ix - dn: ix + dn, iy - dn: iy + dn]
+        snr = snr[ix - dn: ix + dn, iy - dn: iy + dn]
+        
+        # raw sum
+        print "Raw sum:", np.sum(diff[maskphoto])
+        
+        # compute weights
+        weights = np.array(psf / var / np.sum(psf[maskphoto]**2 / var[maskphoto]))
+        weights[np.invert(maskphoto)] = 0
+        
+        # psf masked
+        psfmasked = np.array(psf)
+        psfmasked[np.invert(maskphoto)] = 0
+            
+        # plot regions around SNe
+        if (doplot) & (j=='') :
+            fig, ax = plt.subplots(2, 4, figsize = (12, 6))
+            im = ax[0, 0].imshow(imref, interpolation = 'nearest', origin = 'lower')
+            ax[0, 0].set_title("imref", fontsize = 6)
+            im = ax[0, 1].imshow(imnew, interpolation = 'nearest', origin = 'lower')
+            ax[0, 1].set_title("imnew", fontsize = 6)
+            if conv1st:
+                convlabel = 'imref_conv'
+            else:
+                convlabel = 'imnew_conv'
+            im = ax[0, 2].imshow(imconv, interpolation = 'nearest', origin = 'lower')
+            ax[0, 2].set_title(convlabel, fontsize = 6)
+            im = ax[0, 3].imshow(diff, interpolation = 'nearest', origin = 'lower')
+            ax[0, 3].contour(psfmasked, alpha = 0.3)
+            ax[0, 3].set_title("diff", fontsize = 6)
+            im = ax[1, 0].imshow(weights, interpolation = 'nearest', origin = 'lower')
+            ax[1, 0].contour(psfmasked)
+            ax[1, 0].set_title("weights", fontsize = 6)
+            im = ax[1, 1].imshow(psfmasked, interpolation = 'nearest', origin = 'lower')
+            ax[1, 1].contour(psfmasked)
+            ax[1, 1].set_title("psf", fontsize = 6)
+            im = ax[1, 2].imshow(var, interpolation = 'nearest', origin = 'lower')
+            ax[1, 2].contour(rs2Dstars)
+            ax[1, 2].set_title("variance", fontsize = 6)
+            im = ax[1, 3].imshow(snr, interpolation = 'nearest', origin = 'lower')
+            ax[1, 3].contour(psfmasked)
+            ax[1, 3].set_title("snr", fontsize = 6)
+            plt.savefig(filename.replace(".fits", "_supernova.png"), bbox_inches = 'tight', pad_inches = 0.01)
+          
+        # compute flux
+        print "Computing flux..."
+        if j=='' :
+			print 'with the whole sample of %s stars...' %finalnstars
+        else :
+			print 'with the subsample of %s stars (left star number %i out)...' %(finalnstars,j+1)
+        flux = np.sum(weights * diff)
+        e_flux = np.sqrt(np.sum(weights**2 * var))
+        if j=='' :
+            print "Weighted flux: %s +- %s (SNR: %s)" % (flux, e_flux, flux / e_flux)
         if conv1st:
-            convlabel = 'imref_conv'
+            flux = flux / normfilter
+            e_flux = e_flux / normfilter
+        if j=='' :
+            print "Weighted flux, normed: %s +- %s (SNR: %s)" % (flux, e_flux, flux / e_flux)
+        
+        # compute flux
+        if doplot & (j=='') :
+            fig, ax = plt.subplots()
+            im = ax.imshow(weights * diff, interpolation = 'nearest', origin = 'lower')
+            fig.colorbar(im)
+            figname = os.path.join(outdir,"flux-weights_o%i.png" % order)
+            plt.savefig(figname)
+            diff[np.invert(maskphoto)] = 0
+            fig, ax = plt.subplots()
+            im = ax.imshow(diff, interpolation = 'nearest', origin = 'lower', clim = (0, 200))
+            fig.colorbar(im)
+            figname = os.path.join(outdir,"flux_o%i.png" % order)
+            plt.savefig(figname)
+            
+        # open CCD numbers file
+        CCDn = {}
+        (CCDstring, CCDnumber) = np.loadtxt("CCDnumbers.dat", dtype = str).transpose()
+        CCDnumber = np.array(CCDnumber, dtype = int)
+        for i in range(len(CCDstring)):
+            CCDn[CCDstring[i]] = CCDnumber[i]
+        
+        # open zero point file
+        (ID, filter, a, aerr, b, berr, k, kerr) = np.loadtxt("zeropoints_g.txt", dtype = str).transpose()
+        ID = np.array(ID, dtype = int)
+        a = np.array(a, dtype = float)
+        aerr = np.array(aerr, dtype = float)
+        b = np.array(b, dtype = float)
+        berr = np.array(berr, dtype = float)
+        k = np.array(k, dtype = float)
+        kerr = np.array(kerr, dtype = float)
+            
+        # exposure time and airmass
+        exptimeref = float(headerref['EXPTIME'])
+        airmassref = float(headerref['AIRMASS'])
+        if j=='' :
+            print exptimeref, airmassref
+        
+        # convert flux to magnitudes
+        idx = CCDn[CCD] - 1
+        mag = np.array(-2.5 * np.log10(flux) + 2.5 * np.log10(exptimeref) - a[idx] - k[idx] * airmassref)
+        if flux > e_flux:
+            mag_1 = np.array(-2.5 * np.log10(flux - e_flux) + 2.5 * np.log10(exptimeref) - a[idx] - k[idx] * airmassref)
+            e_mag_1 = mag_1 - mag
         else:
-            convlabel = 'imnew_conv'
-        im = ax[0, 2].imshow(imconv, interpolation = 'nearest', origin = 'lower')
-        ax[0, 2].set_title(convlabel, fontsize = 6)
-        im = ax[0, 3].imshow(diff, interpolation = 'nearest', origin = 'lower')
-        ax[0, 3].contour(psfmasked, alpha = 0.3)
-        ax[0, 3].set_title("diff", fontsize = 6)
-        im = ax[1, 0].imshow(weights, interpolation = 'nearest', origin = 'lower')
-        ax[1, 0].contour(psfmasked)
-        ax[1, 0].set_title("weights", fontsize = 6)
-        im = ax[1, 1].imshow(psfmasked, interpolation = 'nearest', origin = 'lower')
-        ax[1, 1].contour(psfmasked)
-        ax[1, 1].set_title("psf", fontsize = 6)
-        im = ax[1, 2].imshow(var, interpolation = 'nearest', origin = 'lower')
-        ax[1, 2].contour(rs2Dstars)
-        ax[1, 2].set_title("variance", fontsize = 6)
-        im = ax[1, 3].imshow(snr, interpolation = 'nearest', origin = 'lower')
-        ax[1, 3].contour(psfmasked)
-        ax[1, 3].set_title("snr", fontsize = 6)
-        plt.savefig(filename.replace(".fits", "_supernova.png"), bbox_inches = 'tight', pad_inches = 0.01)
-
-    # compute flux
-    flux = np.sum(weights * diff)
-    e_flux = np.sqrt(np.sum(weights**2 * var))
-    print "Weighted flux: %s +- %s (SNR: %s)" % (flux, e_flux, flux / e_flux)
-    if conv1st:
-        flux = flux / normfilter
-        e_flux = e_flux / normfilter
-    print "Weighted flux, normed: %s +- %s (SNR: %s)" % (flux, e_flux, flux / e_flux)
-
-    # compute flux
-    if doplot:
-        fig, ax = plt.subplots()
-        im = ax.imshow(weights * diff, interpolation = 'nearest', origin = 'lower')
-        fig.colorbar(im)
-        figname = os.path.join(outdir,"flux-weights_o%i.png" % order)
-        plt.savefig(figname)
-        diff[np.invert(maskphoto)] = 0
-        fig, ax = plt.subplots()
-        im = ax.imshow(diff, interpolation = 'nearest', origin = 'lower', clim = (0, 200))
-        fig.colorbar(im)
-        figname = os.path.join(outdir,"flux_o%i.png" % order)
-        plt.savefig(figname)
-
-    # open CCD numbers file
-    CCDn = {}
-    (CCDstring, CCDnumber) = np.loadtxt("CCDnumbers.dat", dtype = str).transpose()
-    CCDnumber = np.array(CCDnumber, dtype = int)
-    for i in range(len(CCDstring)):
-        CCDn[CCDstring[i]] = CCDnumber[i]
-
-    # open zero point file
-    (ID, filter, a, aerr, b, berr, k, kerr) = np.loadtxt("zeropoints_g.txt", dtype = str).transpose()
-    ID = np.array(ID, dtype = int)
-    a = np.array(a, dtype = float)
-    aerr = np.array(aerr, dtype = float)
-    b = np.array(b, dtype = float)
-    berr = np.array(berr, dtype = float)
-    k = np.array(k, dtype = float)
-    kerr = np.array(kerr, dtype = float)
-
-    # exposure time and airmass
-    exptimeref = float(headerref['EXPTIME'])
-    airmassref = float(headerref['AIRMASS'])
-    print exptimeref, airmassref
-
-    # convert flux to magnitudes
-    idx = CCDn[CCD] - 1
-    mag = np.array(-2.5 * np.log10(flux) + 2.5 * np.log10(exptimeref) - a[idx] - k[idx] * airmassref)
-    if flux > e_flux:
-        mag_1 = np.array(-2.5 * np.log10(flux - e_flux) + 2.5 * np.log10(exptimeref) - a[idx] - k[idx] * airmassref)
-        e_mag_1 = mag_1 - mag
-    else:
-        mag_1 = 0
-        e_mag_1 = 0
-    mag_2 = np.array(-2.5 * np.log10(flux + e_flux) + 2.5 * np.log10(exptimeref) - a[idx] - k[idx] * airmassref)
-    e_mag_2 = mag - mag_2
-    print "Weighted flux (mag): %s (-%s +%s)" % (mag, e_mag_2, e_mag_1)
-
+            mag_1 = 0
+            e_mag_1 = 0
+        mag_2 = np.array(-2.5 * np.log10(flux + e_flux) + 2.5 * np.log10(exptimeref) - a[idx] - k[idx] * airmassref)
+        e_mag_2 = mag - mag_2
+        if j=='' :
+            print "Weighted flux (mag): %s (-%s +%s)" % (mag, e_mag_2, e_mag_1)
+        
+        # appending computed flux in fluxlist
+        '''
+        The first element is the flux estimator with the whole sample of star (final flux).
+        The other list elements are the estimators with the Left-one-out Jackknife.
+        In case dojackknife=False, this list contains only the final flux.
+        '''
+        fluxlist.append(flux)
+        
+        # appending the pseudovalues for the flux
+        if j!='' :
+            ipseudo = fluxlist[0] + (finalnstars-1)*(fluxlist[0]-flux)
+            pseudoflux.append(ipseudo)
+              
+        # save results
+        fmt = '%i %.4e %.4e %.4e %.4e %.4e %.4e %.4e %.4e %.4e'
+        header = 'line, MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1, pseudoflux(flux)\nline 1 : sample of stars --> %s\nline 2--%s : left-one-out subsamples' %(list_isource, finalnstars+1)
+        if j=='' :
+            fluxout = np.array ([[1, MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1, flux]])
+            np.savetxt(filename.replace(".fits", "_flux.dat"), fluxout, fmt=fmt, header=header)
+        else :
+			fluxout = np.array ([[j+2, MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1, ipseudo]])
+			with open(filename.replace(".fits", "_flux.dat"), 'a') as filetosave :
+				np.savetxt(filetosave, fluxout, fmt=fmt)
+    
+    ### Jackknife ###
+    
+    # bias-corrected flux and estimation of the standard error
+    pseudoflux = np.array(pseudoflux)
+    mean_psflux = np.mean(pseudoflux)
+    var_psflux = np.var(pseudoflux, ddof=1)
+    se_jack = np.sqrt((1./finalnstars)*var_psflux)
+    string1 = 'Results of Jackknife resampling'
+    string2 = 'Bias-corrected estimate of the flux = %.2f' %mean_psflux
+    string3 = 'Variance = %.2f' %var_psflux
+    string4 = 'Estimation of the standard error = %.2f' %se_jack
+    print '\n' + string1
+    print string2
+    print string3
+    print string4
+    # Jackknife 95% confidence interval for the flux ###
+    interval_of_confidence = 'Confidence interval at 95%% --> (%.2f , %.2f)' % (mean_psflux-1.960*se_jack, mean_psflux+1.960*se_jack)
+    print interval_of_confidence
+    # P-value for the hypothesis --> flux (computed with the code) = bias-corrected Jackknife flux
+    Pval = (mean_psflux - fluxlist[0]) / se_jack
+    hypothesis = 'P-value for the null hypothesis --> %.2f' %Pval
+    print hypothesis
+    
     # save results
-    fluxout = np.array ([[MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1]])
-    np.savetxt(filename.replace(".fits", "_flux.dat"), fluxout, fmt='%.4e', header='MJDref, MJD, MJD - MJDref, flux, e_flux, mag, e_mag_2, e_mag_1')
+    with open(filename.replace(".fits", "_flux.dat"), 'a') as filetosave :
+        filetosave.write('\n# ' + string1)
+        filetosave.write('\n# ' + string2)
+        filetosave.write('\n# ' + string3)
+        filetosave.write('\n# ' + string4)
+        filetosave.write('\n# ' + interval_of_confidence)
+        filetosave.write('\n# ' + hypothesis)
