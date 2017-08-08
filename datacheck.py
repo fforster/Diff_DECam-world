@@ -111,19 +111,19 @@ def InstrSNlist (instr, obsdate) :
             continue    
         priHDU = HDU[0].header
         # write header values into file
-        with open (outfile,'a') as outf:
-            if instr == 'DuPont' :
-                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(f.replace(obsdir,''), priHDU['OBJECT'], 
-                priHDU['RA'], priHDU['DEC'], priHDU['FILTER'], priHDU['AIRMASS'], priHDU['EXPTIME']))
-            else :
-                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(f.replace(obsdir,''), priHDU['OBJECT'], 
-                priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))
+        #with open (outfile,'a') as outf:
+        #    if instr == 'DuPont' :
+        #        outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(os.path.basename(f), priHDU['OBJECT'], 
+        #        priHDU['RA'], priHDU['DEC'], priHDU['FILTER'], priHDU['AIRMASS'], priHDU['EXPTIME']))
+        #    else :
+        #        outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(os.path.basename(f), priHDU['OBJECT'], 
+        #        priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))
         # make a list of fits available for given instr and at given obsdate
         list_of_fits.append(f)
         ra.append(priHDU['RA'])
         dec.append(priHDU['DEC'])
         
-    return list_of_fits, ra, dec
+    return list_of_fits, ra, dec, outfile
 
 
 def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='SNHiTS2015.dat') :
@@ -141,7 +141,7 @@ def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='S
     raDECam = np.array(raDECam)
     decDECam = np.array(decDECam)
     # load fits files and their coordinates at obsdate 
-    fitsfile, raSOI, decSOI = InstrSNlist (instr, obsdate)
+    fitsfile, raSOI, decSOI, outfile = InstrSNlist (instr, obsdate)
     fitsfile = np.array(fitsfile)
     raSOI = np.array(raSOI)
     decSOI = np.array(decSOI)
@@ -161,8 +161,11 @@ def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='S
         where it can be processed.
         '''
         inf = f.replace ('rawDATA', 'procDATA')
-        print '\nCopying %s\nin %s' %(f,inf)
-        copyfile (f, inf)
+        if not os.path.exists(inf) :
+            print '\nCopying %s\nin %s' %(f,inf)
+            copyfile (f, inf)
+        else :
+            print '\n%s already exist' %(inf)
         # open the fits (they are already selected without IOError)
         HDU = fits.open(inf, mode='update')    
         priHDU = HDU[0].header
@@ -176,6 +179,24 @@ def check_by_coordinates (instr, obsdate, file2014='SNHiTS2014.dat', file2015='S
             print ('\nSkipping %s ...' %inf)
         HDU.close()
         i += 1
+    
+    # saving header info of the fits file for the obsdata 
+    for f in fitsfile :
+        # open the fits
+        try :
+            HDU = fits.open(f)
+        except IOError :    # error handling for empty/corrupted fits 
+            print ('Error opening %s' %f)
+            continue    
+        priHDU = HDU[0].header
+        # write header values into file
+        with open (outfile,'a') as outf:
+            if instr == 'DuPont' :
+                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\n'.format(os.path.basename(f), priHDU['OBJECT'], 
+                priHDU['RA'], priHDU['DEC'], priHDU['FILTER'], priHDU['AIRMASS'], priHDU['EXPTIME']))
+            else :
+                outf.write('{0}\t{1}\t{2}\t{3}\t{4}\t{5}\t{6}\t{7}\n'.format(os.path.basename(f), priHDU['OBJECT'], 
+                priHDU['RA'], priHDU['DEC'], priHDU['FILTER1'], priHDU['FILTER2'], priHDU['AIRMASS'], priHDU['EXPTIME']))   
 
 	
 if __name__ == "__main__" :
