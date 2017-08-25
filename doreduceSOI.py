@@ -211,10 +211,10 @@ if dodetrend:
     for i in sorted(rawfiles):
     
         filei = "%s/%s" % (rawdir, i)
-        if re.match("zero.*?", i):
+        if (re.match("zero.*?", i)) or (re.match("bias.*?", i)) :
             print "Bias", i
             obs = fits.open(filei)
-            if zero1 == None:
+            if zero1 is None:
                 for iCCD in range(4):
                     zero = obs[iCCD + 1].data
                     if dotrim:
@@ -261,13 +261,13 @@ if dodetrend:
     for i in sorted(rawfiles):
 
         filei = "%s/%s" % (rawdir, i)
-        if re.match("sflat.*?", i) or re.match("flat.*?", i):
+        if re.match("sflat.*?", i) or re.match("flat.*?", i) or re.match("skyflat.*?", i) : # or re.match("domeflat_*?", i) :
             filteri1 = fits.open(filei)[0].header['FILTER1']
             filteri2 = fits.open(filei)[0].header['FILTER2']
             if filteri1 == "s0000 Open" and filteri2 == filters[filter]:
                 print "Flat", i, filter
                 obs = fits.open(filei)
-                if flat1 == None:
+                if flat1 is None:
                     for iCCD in range(4):
                         flat = obs[iCCD + 1].data
                         # remove completely saturated frames
@@ -473,7 +473,7 @@ def findshifttransformation(x1, y1, x2, y2):
     Y = np.zeros(2 * npt)
     Y[0:npt] = x2
     Y[npt: 2 * npt] = y2
-    X = np.zeros((2. * npt, 4))
+    X = np.zeros((2 * npt, 4))
     X[0:npt, 0] = x1
     X[0:npt, 1] = 1.
     X[npt: 2 * npt, 2] = y1
@@ -508,7 +508,7 @@ def findlineartransformation(x1, y1, x2, y2):
     Y = np.zeros(2 * npt)
     Y[0:npt] = x2
     Y[npt: 2 * npt] = y2
-    X = np.zeros((2. * npt, 6))
+    X = np.zeros((2 * npt, 6))
     X[0:npt, 0] = x1
     X[0:npt, 1] = y1
     X[0:npt, 2] = 1.
@@ -549,7 +549,7 @@ def find2ndordertransformation(x1, y1, x2, y2):
     Y = np.zeros(2 * npt)
     Y[0:npt] = x2
     Y[npt: 2 * npt] = y2
-    X = np.zeros((2. * npt, 12))
+    X = np.zeros((2 * npt, 12))
     X[0: npt, 0] = 1.
     X[0: npt, 1] = x1
     X[0: npt, 2] = y1
@@ -597,7 +597,7 @@ def find3rdordertransformation(x1, y1, x2, y2):
     Y = np.zeros(2 * npt)
     Y[0:npt] = x2
     Y[npt: 2 * npt] = y2
-    X = np.zeros((2. * npt, 20))
+    X = np.zeros((2 * npt, 20))
     X[0: npt, 0] = 1.
     X[0: npt, 1] = x1
     X[0: npt, 2] = y1
@@ -724,6 +724,8 @@ if domosaic:
     #ifiles = []
     iMJDs = []
     
+    print files
+    print indir
     for i in sorted(files):
             
         if re.match("image.*?", i):
@@ -741,7 +743,7 @@ if domosaic:
             MJD = Time(isotime).mjd
                 
             #print i, filteri1, filteri2, obj, filteri1 == "s0000 Open", filteri2 == filters[filter]
-            
+
             if filteri1 == "s0000 Open" and filteri2 == filters[filter]:
                 
                 if obj != supernova:
@@ -760,6 +762,7 @@ if domosaic:
                 
                 for pos,ccd in enumerate(CCDSOAR) :
                     
+
                     # open image to project
                     fitsnew = "%s/%s_%s_%s_%04i.fits" % (outdir, obj, filter, ccd, ifile)
                     print 'Opening image %s' %fitsnew
@@ -1326,7 +1329,7 @@ if doconvolve:
             r2sel.append(r[bestmatch])
             
             # save psfs
-            if psf1s == None:
+            if psf1s is None:
                 psf1s = psf1
                 psf2s = psf2
             else:
@@ -1364,8 +1367,17 @@ if doconvolve:
         string_input = raw_input('Input the stars you want to reject.\nUse the numbers in the upper-right corner of each image\nseparated by space (e.g. "1 14 23 30"): ')
         input_list = string_input.split()
         input_list = [int(a)-1 for a in input_list]
+        print input_list
         # update maskrs
-        maskrs[input_list] = -maskrs[input_list]
+        print maskrs
+        maskrs = np.array([False if i in input_list else b for i,b in enumerate(maskrs)])
+        print maskrs
+        print ~maskrs
+        rej = np.array([True if i in input_list else False for i in range(len(maskrs))]) 
+        print rej
+        
+        #maskrs[input_list] = ~maskrs[input_list]
+        
         # update saved stars
         f1sel = np.array(f1sel)
         e_f1sel = np.array(e_f1sel)
@@ -1382,9 +1394,10 @@ if doconvolve:
             if idmax % 5 == 0 :
                 fig, ax = plt.subplots(1, 1)
                 ax.scatter(r1sel[maskrs], r2sel[maskrs], marker = 'o', c = 'b', s = 10, lw = 0.5, label='used for the empirical psf (%i)' %len(r1sel[maskrs]))
-                ax.scatter(r1sel[-maskrs], r2sel[-maskrs], marker = 'o', c = 'k', s = 10, lw = 0.5, label='not used for the empirical psf (%i)' %(len(r1sel[-maskrs])-len(input_list)))
-                ax.scatter(r1sel[-maskrs[input_list]], r2sel[-maskrs[input_list]], marker = 'o', c = 'r', s = 10, lw = 0.5, label='manually rejected (%i)' %len(input_list))
-                idline = np.linspace (min(np.amin(r1sel),np.amin(r2sel)), max(np.amax(r1sel),np.amax(r2sel)))
+                ax.scatter(r1sel[~maskrs], r2sel[~maskrs], marker = 'o', c = 'k', s = 10, lw = 0.5, label='not used for the empirical psf (%i)' %(len(r1sel[~maskrs])-len(input_list)))
+                ax.scatter(r1sel[rej], r2sel[rej], marker = 'o', c = 'r', s = 10, lw = 0.5, label='manually rejected (%i)' %len(input_list))
+                #idline = np.linspace (min(np.amin(r1sel),np.amin(r2sel)), max(np.amax(r1sel),np.amax(r2sel)))
+                idline = np.linspace (min([min(r1sel),min(r2sel)]), max([max(r1sel),max(r2sel)]))
                 ax.plot (idline, idline, 'k--')
                 ax.set_title ('Radii of selected stars for the kernel')
                 ax.set_xlabel (r'$r_{\rm DECam}\,[\rm{ADU}]$')
@@ -1407,8 +1420,8 @@ if doconvolve:
                 fig, ax = plt.subplots(1, 1)
                 #ax = plt.gca()
                 ax.scatter(logf1sel, logf2sel, marker = 'o', c = 'b', s = 10, lw = 0.5, label='used for the empirical psf (%i)' %len(logf1sel))
-                ax.scatter(np.log10(f1sel[-maskrs]), np.log10(f2sel[-maskrs]), marker = 'o', c = 'k', s = 10, lw = 0.5, label='not used for the empirical psf (%i)' %(len(f1sel[-maskrs])-len(input_list)))
-                ax.scatter(np.log10(f1sel[-maskrs[input_list]]), np.log10(f2sel[-maskrs[input_list]]), marker = 'o', c = 'r', s = 10, lw = 0.5, label='manually rejected (%i)' %len(input_list))
+                ax.scatter(np.log10(f1sel[~maskrs]), np.log10(f2sel[~maskrs]), marker = 'o', c = 'k', s = 10, lw = 0.5, label='not used for the empirical psf (%i)' %(len(f1sel[~maskrs])-len(input_list)))
+                ax.scatter(np.log10(f1sel[rej]), np.log10(f2sel[rej]), marker = 'o', c = 'r', s = 10, lw = 0.5, label='manually rejected (%i)' %len(input_list))
                 #ax.set_yscale('log')
                 #ax.set_xscale('log')
                 #idline = np.linspace (min(np.amin(f1sel),np.amin(f2sel)), max(np.amax(f1sel),np.amax(f2sel)))
@@ -1710,12 +1723,12 @@ if dophotometry:
         
         # mask for region to be included in the photometry
         maskphoto = (psf >= 0.2 * np.max(psf)) & (rs2Dstars < 4)
-        imref = imref[ix - dn: ix + dn, iy - dn: iy + dn]
-        imnew = imnew[ix - dn: ix + dn, iy - dn: iy + dn]
-        imconv = imconv[ix - dn: ix + dn, iy - dn: iy + dn]
-        diff = diff[ix - dn: ix + dn, iy - dn: iy + dn]
-        var = var[ix - dn: ix + dn, iy - dn: iy + dn]
-        snr = snr[ix - dn: ix + dn, iy - dn: iy + dn]
+        imref = imref[int(ix - dn): int(ix + dn), int(iy) - int(dn): int(iy + dn)]
+        imnew = imnew[int(ix - dn): int(ix + dn), int(iy - dn): int(iy + dn)]
+        imconv = imconv[int(ix - dn): int(ix + dn), int(iy - dn): int(iy + dn)]
+        diff = diff[int(ix - dn): int(ix + dn), int(iy - dn): int(iy + dn)]
+        var = var[int(ix - dn): int(ix + dn), int(iy - dn): int(iy + dn)]
+        snr = snr[int(ix - dn): int(ix + dn), int(iy - dn): int(iy + dn)]
         
         # raw sum
         print "Raw sum:", np.sum(diff[maskphoto])

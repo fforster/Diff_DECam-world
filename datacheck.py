@@ -1,5 +1,4 @@
 #!/usr/bin/python2.7
-
 '''
 A main function check_by_coordinates calls other two functions:
 - DECamSNlist
